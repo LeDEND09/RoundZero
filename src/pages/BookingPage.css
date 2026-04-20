@@ -1,0 +1,177 @@
+/* BookingPage.css — Warm Clay System */
+
+.booking-container {
+  max-width: 680px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.expert-mini-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  box-shadow: var(--clay-shadow);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.expert-mini-avatar {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent3), var(--accent-dim));
+  border: 2px solid var(--accent-glow);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.expert-mini-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.expert-mini-meta {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text2);
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.slots-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  box-shadow: var(--clay-shadow);
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.slot-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: var(--clay-shadow);
+}
+.slot-card:hover {
+  border-color: var(--accent-glow);
+  background: var(--accent-dim);
+  transform: translateY(-1px);
+  box-shadow: var(--clay-hover);
+}
+.slot-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.slot-time {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.slot-date {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.slot-duration {
+  display: inline-block;
+  margin-top: 8px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-glow);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
+.book-action-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  box-shadow: var(--clay-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.btn-book {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 24px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--clay-shadow);
+  transition: all 0.2s;
+}
+.btn-book:hover:not(:disabled) {
+  box-shadow: var(--clay-hover);
+  transform: translateY(-1px);
+}
+.btn-book:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.no-slots-msg {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text3);
+  text-align: center;
+  padding: 32px 0;
+}
+
+/* Success state */
+.success-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 48px 32px;
+  text-align: center;
+  box-shadow: var(--clay-shadow);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.success-icon {
+  width: 64px; height: 64px;
+  background: var(--green-dim);
+  border: 2px solid rgba(74,158,110,0.3);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  color: var(--green);
+  margin: 0 auto 20px;
+}

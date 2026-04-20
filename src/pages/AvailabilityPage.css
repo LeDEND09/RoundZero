@@ -1,0 +1,270 @@
+/* AvailabilityPage.css — Warm Clay System */
+
+.availability-inner {
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Clay Card — main design primitive */
+.clay-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 28px;
+  box-shadow: var(--clay-shadow);
+  margin-bottom: 20px;
+  transition: box-shadow 0.2s;
+}
+.clay-card:hover { box-shadow: var(--clay-hover); }
+
+.clay-card-header {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Segment pills for date selection */
+.segment-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.segment-btn {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.18s;
+  text-align: center;
+  box-shadow: var(--clay-shadow);
+}
+.segment-btn:hover { background: var(--bg2); color: var(--text); }
+.segment-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent-glow);
+  font-weight: 600;
+}
+
+/* Time pickers */
+.time-picker-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.time-picker-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.time-picker-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+}
+
+.time-select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+  box-shadow: var(--clay-inset);
+  outline: none;
+  transition: all 0.2s;
+  cursor: pointer;
+  width: 100%;
+}
+.time-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+/* Duration input */
+.duration-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.clay-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+  box-shadow: var(--clay-inset);
+  outline: none;
+  transition: all 0.2s;
+  width: 100%;
+}
+.clay-input::placeholder { color: var(--text3); }
+.clay-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+/* Wrapper for date picker trigger */
+.clay-input-wrapper {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--clay-inset);
+  overflow: hidden;
+}
+
+/* Primary button */
+.clay-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 24px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--clay-shadow);
+  transition: all 0.2s;
+  width: 100%;
+  text-align: center;
+}
+.clay-btn-primary:hover:not(:disabled) {
+  box-shadow: var(--clay-hover);
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+.clay-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.page-header {
+  margin-bottom: 24px;
+}
+.page-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+.page-subtitle {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text2);
+}
+
+/* Saved slots list */
+.slots-list-header {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  margin-bottom: 12px;
+}
+
+.slot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.slot-row:last-child { border-bottom: none; }
+
+.slot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.slot-time-text {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+.slot-date-text {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.slot-delete-btn {
+  background: var(--red-dim);
+  border: 1px solid rgba(192,71,58,0.2);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--red);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.slot-delete-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
+
+.error-banner {
+  background: var(--red-dim);
+  border: 1px solid rgba(192,71,58,0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--red);
+  margin-bottom: 16px;
+}
+
+.success-banner {
+  background: var(--green-dim);
+  border: 1px solid rgba(74,158,110,0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--green);
+  margin-bottom: 16px;
+}
+
+.am-pm-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.am-pm-btn {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  background: var(--surface2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.18s;
+  text-align: center;
+  box-shadow: var(--clay-shadow);
+}
+.am-pm-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent-glow);
+}
