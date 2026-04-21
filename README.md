@@ -4,6 +4,9 @@
 [![React](https://img.shields.io/badge/React-19-blue)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6-purple)](https://vitejs.dev/)
 [![Firebase](https://img.shields.io/badge/Firebase-v12-orange)](https://firebase.google.com/)
+Video Preview 👉👉 [![Video Preview](https://shields.io)](https://drive.google.com/file/d/1rrXyJrCF2a4feZ482Y8dFbpHzLWgCuI7/view)
+
+
 
 ## 🎯 Project Overview
 **RoundZero** is a comprehensive, production-grade platform designed to revolutionize technical interview preparation. It bridges the gap between static study materials and expensive human coaching by providing a marketplace where candidates can book mock interviews with industry experts, supported by real-time AI assistance and high-performance collaborative tools.
