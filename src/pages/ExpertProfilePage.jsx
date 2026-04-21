@@ -93,6 +93,11 @@ export default function ExpertProfilePage() {
 
   const diffColors = ['diff-junior', 'diff-mid', 'diff-senior', 'diff-staff'];
 
+  // Clean years of experience
+  const cleanYears = expert.yearsOfExperience 
+    ? expert.yearsOfExperience.toString().replace(/ yrs/gi, '').replace(/\+/g, '').trim() 
+    : '5';
+
   return (
     <PageLayout>
       <motion.div 
@@ -111,8 +116,8 @@ export default function ExpertProfilePage() {
             position: relative;
             overflow: hidden;
             display: flex;
-            gap: 32px;
-            align-items: flex-start;
+            gap: 24px;
+            align-items: stretch;
           }
           .ep-hero-top-accent {
             position: absolute;
@@ -127,6 +132,10 @@ export default function ExpertProfilePage() {
             margin-left: auto;
             text-align: right;
             flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-width: 140px;
           }
           
           .ep-hex-wrapper {
@@ -152,30 +161,33 @@ export default function ExpertProfilePage() {
 
           .ep-name {
             font-family: var(--font-display);
-            font-size: 26px;
+            font-size: 32px;
             font-weight: 700;
             color: var(--text);
-            letter-spacing: -0.02em;
-            margin-top: 14px;
+            letter-spacing: -0.03em;
+            margin-top: 18px;
+            line-height: 1.1;
           }
           .ep-title {
-            font-size: 14px;
+            font-size: 15px;
+            font-weight: 500;
             color: var(--text2);
-            margin-top: 4px;
+            margin-top: 6px;
           }
           .ep-verified {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 5px;
             background: var(--green-dim);
             color: var(--green);
-            border: 1px solid rgba(74,158,110,0.2);
-            border-radius: 20px;
-            padding: 3px 10px;
+            border: 1px solid var(--green-dim);
+            border-radius: 6px;
+            padding: 4px 10px;
             font-size: 11px;
             font-weight: 600;
             font-family: var(--font-ui);
-            margin-top: 8px;
+            margin-top: 12px;
+            box-shadow: 0 0 10px rgba(74, 158, 110, 0.05);
           }
           .ep-bio {
             font-size: 13px;
@@ -213,23 +225,25 @@ export default function ExpertProfilePage() {
           }
           .ep-rating-num {
             font-family: var(--font-display);
-            font-size: 32px;
+            font-size: 38px;
             font-weight: 700;
             color: var(--text);
+            line-height: 1;
           }
           .ep-rating-label {
             font-size: 12px;
             color: var(--text3);
             display: block;
-            margin-top: 2px;
+            margin-top: 4px;
             text-align: right;
+            font-weight: 500;
           }
           
           .ep-mini-stats {
             display: flex;
             flex-direction: row;
-            gap: 20px;
-            margin-top: 16px;
+            gap: 24px;
+            margin-top: 24px;
             justify-content: flex-end;
           }
           .ep-stat-val {
@@ -418,16 +432,17 @@ export default function ExpertProfilePage() {
             font-weight: 600;
           }
           .ep-bar-track {
-            height: 6px;
+            height: 4px;
             background: var(--bg3);
-            border-radius: 3px;
-            box-shadow: var(--clay-inset);
+            border-radius: 4px;
             overflow: hidden;
+            position: relative;
           }
           .ep-bar-fill {
-            height: 6px;
-            border-radius: 3px;
+            height: 100%;
+            border-radius: 4px;
             background: linear-gradient(90deg, var(--accent), var(--accent2));
+            box-shadow: 0 0 10px var(--accent-glow);
           }
           .ep-footer-note {
             display: flex;
@@ -500,6 +515,60 @@ export default function ExpertProfilePage() {
             margin-top: 8px;
             margin-bottom: 0;
           }
+
+          /* MOBILE OPTIMIZATIONS */
+          @media (max-width: 768px) {
+            .ep-hero-card {
+              flex-direction: column;
+              padding: 24px;
+              align-items: center;
+              text-align: center;
+              gap: 20px;
+            }
+            .ep-hero-left {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              width: 100%;
+            }
+            .ep-hero-right {
+              margin-left: 0;
+              width: 100%;
+              text-align: center;
+              align-items: center;
+              margin-top: 10px;
+              gap: 12px;
+              min-width: 0;
+            }
+            .ep-star-row, .ep-mini-stats {
+              justify-content: center;
+              width: 100%;
+            }
+            .ep-rating-label {
+              text-align: center;
+            }
+            .ep-mini-stats {
+              margin-top: 16px;
+            }
+            .ep-grid {
+              grid-template-columns: 1fr;
+            }
+            .ep-name {
+              font-size: 28px;
+              margin-top: 14px;
+            }
+            .ep-bio {
+              max-width: 100%;
+              margin-top: 12px;
+            }
+            .ep-domain-tags {
+              justify-content: center;
+            }
+            .ep-book-btn {
+              margin-top: 16px;
+              max-width: 280px;
+            }
+          }
         `}</style>
 
         <div style={{ paddingBottom: '40px' }}>
@@ -541,7 +610,7 @@ export default function ExpertProfilePage() {
 
               <div className="ep-mini-stats">
                 <div>
-                  <div className="ep-stat-val">{expert.yearsOfExperience || '5+'} yrs</div>
+                  <div className="ep-stat-val">{cleanYears}+ yrs</div>
                   <div className="ep-stat-lbl">Experience</div>
                 </div>
                 <div>

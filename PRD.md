@@ -2,62 +2,76 @@
 
 **Project Name:** RoundZero
 **Tagline:** The AI-Assisted Mock Interview Marketplace
-**Document Status:** Draft (MVP Phase)
+**Document Status:** Beta (Production-Ready MVP)
 
 ## 1. Executive Summary
 **The Problem:** High-quality mock technical interviews with real industry experts are prohibitively expensive because experts must spend unpaid time preparing questions and writing detailed feedback reports.
 
-**The Solution:** A two-sided marketplace that pairs job candidates with industry experts for live video interviews. The platform uses Google Gemini AI as an "interviewer co-pilot" to generate real-time, scenario-based questions and automatically analyzes the call transcript to produce a comprehensive feedback report, eliminating prep and administrative work for the expert.
+**The Solution:** A two-sided marketplace that pairs job candidates with industry experts for live video interviews. The platform uses Google Gemini AI (1.5 Flash) as an "interviewer co-pilot" to generate real-time, scenario-based questions and automatically analyzes the call transcript to produce a comprehensive feedback report, eliminating prep and administrative work for the expert.
 
 ## 2. Target Audience (User Personas)
 **The Candidate (Interviewee):** Software engineers actively applying for jobs who need realistic, high-pressure practice and objective, actionable feedback.
-
 **The Expert (Interviewer):** Senior engineers or tech leads who want to mentor and monetize their free time, but only want to commit to the actual time spent on the call (zero prep, zero paperwork).
 
 ## 3. Core User Stories
 **As a Candidate, I want to...**
-- Securely log in and create a profile detailing my target role.
-- Browse a list of available experts filtered by technical domain.
+- Securely log in and create a profile detailing my target role and tech stack.
+- Browse a list of available experts filtered by technical domain and experience.
 - Book an available time slot on an expert's calendar.
-- Join a secure video call room at the scheduled time.
+- Join a secure video call room with an integrated collaborative code editor.
 - Receive an automated, AI-generated performance scorecard after the call ends.
+- Have my interview recorded and transcribed for future review.
 
 **As an Expert, I want to...**
-- Create a profile highlighting my company, title, and specialized tech stack.
-- Set recurring or specific blocks of availability.
+- Create a professional profile highlighting my company, seniority, and specialized tech stack.
+- Set recurring or specific blocks of availability with role-specific descriptions.
 - Join a scheduled video call and see AI-generated, scenario-based questions tailored to the candidate's target role.
-- Have the platform automatically generate and send the feedback report to the candidate so I can leave the platform immediately after hanging up.
+- Use a live scorecard to rate the candidate across 6 key dimensions in real-time.
+- Have the platform automatically generate the final feedback report from the transcript and my live notes.
 
 ## 4. MVP Functional Scope
+
 ### A. Authentication & Onboarding
-**Tech:** Firebase Authentication.
-**Features:** Email/Password or Google OAuth login. A split onboarding flow determining if the user is a Candidate or an Expert.
+- **Tech:** Firebase Authentication & Firestore.
+- **Features:** Google OAuth & Email login. Tailored onboarding flows for Candidates (target role, focus areas) and Experts (seniority, domain expertise, LinkedIn verification).
 
-### B. Scheduling Engine
-**Tech:** Firestore (Collections: users, availability, bookings).
-**Features:** Experts can define time blocks. Candidates can select an open block, generating a booking document that locks the slot and generates a unique stream_call_id.
+### B. Scheduling & Discovery
+- **Tech:** Firestore (Collections: `users`, `availability`, `bookings`).
+- **Features:** 
+    - Expert availability management with role-specific slot descriptions.
+    - Expert discovery grid with real-time client-side filtering by domain and stack.
+    - Atomic booking checkout flow with instant `stream_call_id` generation.
 
-### C. The Interview Room (Live Call)
-**Tech:** Stream Video & Chat SDKs, Animate.ui (Hexagon background).
-**Features:**
-- High-fidelity video/audio grid.
-- Persistent side-chat for sharing links/text.
-- *Expert-Only View:* A side panel displaying Gemini-generated scenarios and "Red Flag / Green Flag" probing questions.
+### C. The Interview Room (Integrated Workspace)
+- **Tech:** Stream Video & Chat SDKs, Firebase RTDB, Monaco Editor.
+- **Features:**
+    - **High-Fidelity Video/Audio:** Real-time communication with adaptive layouts.
+    - **Collaborative Code Editor:** Monaco-powered (VS Code engine) with sub-300ms sync, multi-language support, and real-time cursor tracking.
+    - **Expert Co-Pilot Panel:** 
+        - **AI Questions:** Dynamic technical scenarios generated by Gemini 1.5 Flash.
+        - **Live Scorecard:** 6-category rating system (Comm, Problem Solving, Code Quality, etc.) with debounced auto-save.
+    - **Anti-Cheat Protection:** Real-time tab-switching detection and logging for candidates.
+    - **Persistent Chat:** Integrated Stream Chat for code snippets and links.
 
-### D. Automated AI Feedback Pipeline
-**Tech:** Stream Webhooks + Firebase Cloud Functions + Gemini API.
-**Features:**
-- Automated cloud recording and background transcription triggered on call start.
-- A webhook triggers a Firebase Cloud Function when the transcript is ready.
-- The Function sends the transcript to Gemini with a strict grading prompt.
-- The resulting JSON scorecard (Technical Score, Communication, Strengths, Improvements) is saved to Firestore and displayed on the Candidate's dashboard.
+### D. Automated Feedback Pipeline
+- **Tech:** Stream Webhooks + Firebase Cloud Functions + Gemini 1.5 Flash.
+- **Features:**
+    - Automated cloud recording triggered upon dual-join.
+    - Post-call transcript analysis combining expert live notes and AI evaluation.
+    - Detailed JSON scorecard saved to Firestore and displayed on user dashboards.
 
-## 5. Non-Functional Requirements
-**Security:** API keys (Stream Secret, Gemini Key) must not be exposed in the Vite frontend. All token generation and AI prompting must occur securely within Firebase Cloud Functions.
-**Performance:** The UI must be a fast, client-side routed Single Page Application (SPA).
-**Scalability:** Firestore rules must be strictly configured so Candidates can only read their own feedback, and Experts can only edit their own availability.
+## 5. Visual Identity & UX
+- **Design System:** "Modern Fintech Light" with Claymorphism accents.
+- **Core Elements:** Animated Hexagon Background with electric purple hover-glow, Outfit/Plus Jakarta Sans typography, and high-contrast primary UI states.
+- **Responsiveness:** Fully optimized for Mobile, Tablet, and Desktop with mutual exclusion panel logic on small screens.
 
-## 6. Out of Scope for MVP (V2 Features)
-- Integrated payment gateways (e.g., Stripe) for charging candidates and paying experts.
-- In-browser collaborative code editor (monaco-editor).
-- Algorithmic auto-matching between candidates and experts.
+## 6. Technical Requirements
+- **Security:** Server-side token generation for Stream and Gemini via Firebase Cloud Functions. Secure RTDB rules for session-scoped data.
+- **Performance:** SPA architecture (Vite + React) with real-time `onSnapshot` listeners for zero-refresh updates.
+- **Infrastructure:** Node.js 20 Cloud Functions, Firebase Firestore & Realtime Database.
+
+## 7. Future Roadmap (V2+)
+- **Monetization:** Stripe integration for expert payments and platform fees.
+- **Smart Matching:** AI-driven recommendations based on candidate weak points and expert specializations.
+- **Custom Environments:** Pre-configured Docker-based coding environments for complex system design interviews.
+- **Resume Parsing:** AI-powered profile population from uploaded PDFs.
