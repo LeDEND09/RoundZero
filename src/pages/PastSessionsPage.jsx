@@ -251,8 +251,8 @@ export default function PastSessionsPage() {
 
             // Only past sessions
             if (sTime >= now) continue;
-            // Only confirmed or cancelled
-            if (bData.status !== 'confirmed' && bData.status !== 'cancelled') continue;
+            // Only confirmed, completed, or cancelled
+            if (bData.status !== 'confirmed' && bData.status !== 'completed' && bData.status !== 'cancelled') continue;
 
             const otherId = isCand ? bData.expertUid : bData.candidateUid;
             let otherUser = {};
@@ -301,7 +301,7 @@ export default function PastSessionsPage() {
   /* ── derived ── */
   const filtered = useMemo(() => bookings.filter((b) => {
     if (filter === 'All') return true;
-    if (filter === 'Completed') return b.status === 'confirmed';
+    if (filter === 'Completed') return b.status === 'confirmed' || b.status === 'completed';
     if (filter === 'Cancelled') return b.status === 'cancelled';
     return true;
   }), [bookings, filter]);

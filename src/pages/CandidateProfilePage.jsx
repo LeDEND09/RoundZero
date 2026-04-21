@@ -21,6 +21,7 @@ export default function CandidateProfilePage() {
   const [formData, setFormData] = useState({});
   const [saving, setSaving] = useState(false);
   const [stats, setStats] = useState({ totalBookings: 0, avgTech: '-', avgComm: '-' });
+  const [recentSessions, setRecentSessions] = useState([]);
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -66,6 +67,29 @@ export default function CandidateProfilePage() {
             avgTech: count > 0 ? (techSum / count).toFixed(1) : '-',
             avgComm: count > 0 ? (commSum / count).toFixed(1) : '-'
           });
+
+          // 3. Fetch Top 3 Recent Sessions
+          const sQuery = query(collection(db, 'bookings'), where(roleKey, '==', u.uid));
+          const sSnap = await getDocs(sQuery);
+          let sessList = [];
+          const now = new Date();
+          
+          for (const d of sSnap.docs) {
+            const b = d.data();
+            const sTime = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime);
+            if (sTime < now && (b.status === 'completed' || b.status === 'confirmed')) {
+              // Fetch expert info
+              const eRef = doc(db, 'users', b.expertUid);
+              const eSnap = await getDoc(eRef);
+              sessList.push({ id: d.id, ...b, expertName: eSnap.exists() ? eSnap.data().name : 'Expert', expertTitle: eSnap.exists() ? eSnap.data().title : 'Expert' });
+            }
+          }
+          sessList.sort((a,b) => {
+            const dA = a.startTime?.toDate ? a.startTime.toDate() : new Date(a.startTime);
+            const dB = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime);
+            return dB - dA;
+          });
+          setRecentSessions(sessList.slice(0, 3));
         }
 
       } catch (err) {
@@ -407,6 +431,42 @@ export default function CandidateProfilePage() {
           .cp-ghost-btn:hover {
             color: var(--text);
           }
+
+          .cp-session-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--bg2);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+          }
+          .cp-sess-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+          .cp-sess-ava {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+          }
+          .cp-sess-name {
+             font-size: 14px;
+             font-weight: 600;
+             color: var(--text);
+          }
+          .cp-sess-meta {
+             font-size: 12px;
+             color: var(--text3);
+          }
         `}</style>
 
         <div style={{ paddingBottom: '40px' }}>
@@ -640,6 +700,36 @@ export default function CandidateProfilePage() {
               )}
             </div>
 
+          </div>
+
+          {/* RECENT SESSIONS SECTION */}
+          <div className="cp-card" style={{ marginTop: '24px' }}>
+            <div className="cp-card-header">
+              <h3 className="cp-card-title">Recent Past Sessions</h3>
+              <button onClick={() => navigate('/past-sessions')} className="cp-edit-btn" style={{ margin: 0 }}>View all</button>
+            </div>
+            <div className="cp-card-body" style={{ gap: '12px' }}>
+              {recentSessions.length === 0 ? (
+                <div className="cp-empty-txt" style={{ textAlign: 'center', padding: '20px 0' }}>No past sessions found yet.</div>
+              ) : (
+                recentSessions.map(sess => {
+                  const sInitials = sess.expertName.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+                  const sDate = sess.startTime?.toDate ? sess.startTime.toDate() : new Date(sess.startTime);
+                  return (
+                    <div key={sess.id} className="cp-session-item">
+                       <div className="cp-sess-info">
+                         <div className="cp-sess-ava">{sInitials}</div>
+                         <div>
+                           <div className="cp-sess-name">{sess.expertName}</div>
+                           <div className="cp-sess-meta">{sess.expertTitle} · {sDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                         </div>
+                       </div>
+                       <div style={{ color: 'var(--green)', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Completed</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
 
         </div>
