@@ -116,7 +116,8 @@ function Scorecard({ bookingId, initialFeedback }) {
     summary = '',
     strengths = [],
     improvements = [],
-    transcript = ''
+    transcript = '',
+    expertCorroboration = ''
   } = feedback;
 
   return (
@@ -133,6 +134,17 @@ function Scorecard({ bookingId, initialFeedback }) {
           <div className="ps-summary-label">Session summary</div>
           <div className="ps-summary-text">{summary}</div>
         </>
+      )}
+
+      {/* Expert Corroboration */}
+      {expertCorroboration && (
+        <div style={{ marginBottom: 12 }}>
+          <div className="ps-summary-label" style={{ color: 'var(--text2)', marginBottom: 4 }}>Expert–AI Corroboration</div>
+          <div className="ps-corroboration-box">
+            <div className="ps-corroboration-icon">✓</div>
+            <div>{expertCorroboration}</div>
+          </div>
+        </div>
       )}
 
       {/* Strengths */}
@@ -445,8 +457,16 @@ export default function PastSessionsPage() {
                         {isCancelled ? (
                           <div className="ps-score-pill score-cancelled">Cancelled</div>
                         ) : overallScore !== null ? (
-                          <div className={`ps-score-pill ${getScoreClass(overallScore)}`}>
-                            {overallScore.toFixed(1)}
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div className={`ps-score-pill ${getScoreClass(overallScore)}`}>
+                              {overallScore.toFixed(1)}
+                            </div>
+                            {b.feedback?.gradedBy === 'gemini' && (
+                              <div className="ps-ai-badge">AI graded</div>
+                            )}
+                            {(b.feedback?.gradedBy === 'gemini-fallback' || b.feedback?.isHardcoded === true) && (
+                              <div className="ps-ai-badge">Pending</div>
+                            )}
                           </div>
                         ) : (
                           <div className="ps-score-pill score-pending">Feedback pending</div>

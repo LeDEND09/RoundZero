@@ -1202,7 +1202,7 @@ export default function RoomPage() {
 
           // TODO Phase E: Replace this URL with the real Gemini
           // grading function when the audio pipeline is ready.
-          await fetch('/api/generateHardcodedFeedback', {
+          await fetch('/api/generateAiFeedback', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

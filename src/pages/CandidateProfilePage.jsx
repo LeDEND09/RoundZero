@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db } from '../firebase';
+import { useTheme } from '../lib/ThemeContext';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import PageLayout from '../components/PageLayout';
 import LoadingScreen from '../components/LoadingScreen';
+import './ProfilePages.css';
 
 const CAND_EXP_OPTIONS = ["Fresher", "1–3 yrs", "3–5 yrs", "5–8 yrs", "8+ yrs"];
 const EXPERT_EXP_OPTIONS = ["5–8 yrs", "8–10 yrs", "10+ yrs"];
@@ -23,8 +25,15 @@ export default function CandidateProfilePage() {
   const [stats, setStats] = useState({ totalBookings: 0, avgTech: '-', avgComm: '-' });
   const [recentSessions, setRecentSessions] = useState([]);
   const [successMsg, setSuccessMsg] = useState('');
+  const { dark } = useTheme();
+
+  // Expert specific data
+  const [slots, setSlots] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [activeTab, setActiveTab] = useState('Available Sessions');
 
   useEffect(() => {
+    let unsubSlots = () => {};
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         navigate('/login');
@@ -41,8 +50,8 @@ export default function CandidateProfilePage() {
           setProfile(data);
           setFormData(data);
 
-          // Fetch Stats dynamically depending on role
-          const roleKey = data.role === 'expert' ? 'expertUid' : 'candidateUid';
+          const isExpert = data.role === 'expert';
+          const roleKey = isExpert ? 'expertUid' : 'candidateUid';
           
           // 1. Total bookings completed
           const bQuery = query(collection(db, 'bookings'), where(roleKey, '==', u.uid), where('status', '==', 'completed'));
@@ -78,10 +87,17 @@ export default function CandidateProfilePage() {
             const b = d.data();
             const sTime = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime);
             if (sTime < now && (b.status === 'completed' || b.status === 'confirmed')) {
-              // Fetch expert info
-              const eRef = doc(db, 'users', b.expertUid);
-              const eSnap = await getDoc(eRef);
-              sessList.push({ id: d.id, ...b, expertName: eSnap.exists() ? eSnap.data().name : 'Expert', expertTitle: eSnap.exists() ? eSnap.data().title : 'Expert' });
+              // Fetch other user info
+              const otherId = isExpert ? b.candidateUid : b.expertUid;
+              const otherRef = doc(db, 'users', otherId);
+              const otherSnap = await getDoc(otherRef);
+              const oData = otherSnap.exists() ? otherSnap.data() : {};
+              sessList.push({ 
+                id: d.id, 
+                ...b, 
+                otherName: oData.name || 'User', 
+                otherTitle: isExpert ? (oData.targetRole || 'Candidate') : (oData.title || 'Expert') 
+              });
             }
           }
           sessList.sort((a,b) => {
@@ -90,13 +106,32 @@ export default function CandidateProfilePage() {
             return dB - dA;
           });
           setRecentSessions(sessList.slice(0, 3));
+
+          // 4. Expert specific data fetches (if expert)
+          if (isExpert) {
+             // Slots
+             const slotsQuery = query(collection(db, 'availability', u.uid, 'slots'), where('isBooked', '==', false));
+             unsubSlots = onSnapshot(slotsQuery, (sn) => {
+               let sArr = [];
+               sn.forEach(d => sArr.push({ id: d.id, ...d.data() }));
+               sArr.sort((a,b) => (a.startTime?.toDate ? a.startTime.toDate() : new Date(a.startTime)) - (b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime)));
+               setSlots(sArr.slice(0, 5));
+             });
+
+             // Reviews
+             const rQuery = query(collection(db, 'users', u.uid, 'reviews'));
+             const rSnap = await getDocs(rQuery);
+             let rArr = [];
+             rSnap.forEach(d => rArr.push({ id: d.id, ...d.data() }));
+             setReviews(rArr);
+          }
         }
 
       } catch (err) {
         console.error("Error fetching profile", err);
       }
     });
-    return () => unsub();
+    return () => { unsub(); unsubSlots(); };
   }, [navigate]);
 
   if (!profile) return <LoadingScreen text="Loading..." />;
@@ -133,607 +168,600 @@ export default function CandidateProfilePage() {
     }
   };
 
-  return (
-    <PageLayout>
-      <motion.div 
-        initial={{ opacity: 0, y: 12 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        transition={{ duration: 0.28, ease: "easeOut" }}
-      >
-        <style>{`
-          .cp-header-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            box-shadow: var(--clay-shadow);
-            padding: 32px;
-            margin-bottom: 24px;
-            position: relative;
-            overflow: hidden;
-            width: 100%;
-          }
-          .cp-header-top-accent {
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent), transparent);
-          }
-          .cp-header-inner {
-            display: flex;
-            flex-direction: row;
-            align-items: flex-start;
-            gap: 28px;
-          }
-          
-          .cp-avatar {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            flex-shrink: 0;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: var(--font-display);
-            font-size: 24px;
-            font-weight: 700;
-            color: white;
-            box-shadow: var(--clay-shadow);
-            border: 3px solid rgba(184,150,90,0.2);
-          }
+  const getTagStyle = (tech) => {
+    const t = tech.toLowerCase();
+    if (['react', 'vue', 'angular', 'next.js', 'typescript'].includes(t))
+      return { 
+        background: 'rgba(78,168,247,0.12)',
+        color: '#4ea8f7',
+        border: '1px solid rgba(78,168,247,0.2)'
+      };
+    if (['python', 'django', 'flask', 'node.js', 'node'].includes(t))
+      return {
+        background: 'rgba(74,158,110,0.12)',
+        color: '#4a9e6e', 
+        border: '1px solid rgba(74,158,110,0.2)'
+      };
+    if (['java', 'spring', 'kotlin', 'go', 'rust'].includes(t))
+      return {
+        background: 'rgba(245,166,35,0.12)',
+        color: '#c4882a',
+        border: '1px solid rgba(245,166,35,0.2)'
+      };
+    if (['aws', 'docker', 'kubernetes', 'k8s', 'devops'].includes(t))
+      return {
+        background: 'rgba(90,184,214,0.12)',
+        color: '#5ab8d6',
+        border: '1px solid rgba(90,184,214,0.2)'
+      };
+    if (['sql', 'postgresql', 'mysql', 'mongodb'].includes(t))
+      return {
+        background: 'rgba(150,120,247,0.12)',
+        color: '#9678f7',
+        border: '1px solid rgba(150,120,247,0.2)'
+      };
+    // default gold
+    return {
+      background: 'rgba(184,150,90,0.1)',
+      color: '#b8965a',
+      border: '1px solid rgba(184,150,90,0.2)'
+    };
+  };
 
-          .cp-info-block {
-            flex: 1;
-          }
-          .cp-name {
-            font-family: var(--font-display);
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--text);
-            letter-spacing: -0.02em;
-            margin: 0;
-          }
-          .cp-role-pill {
-            display: inline-flex;
-            margin-top: 6px;
-            background: var(--accent-dim);
-            color: var(--accent);
-            border: 1px solid var(--accent-glow);
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 12px;
-            font-weight: 600;
-            font-family: var(--font-ui);
-          }
-          .cp-email {
-            font-size: 13px;
-            color: var(--text3);
-            font-family: var(--font-body);
-            margin-top: 6px;
-          }
-
-          .cp-edit-btn {
-            margin-left: auto;
-            align-self: flex-start;
-            background: transparent;
-            border: 1px solid var(--border2);
-            color: var(--text2);
-            border-radius: 8px;
-            padding: 7px 16px;
-            font-size: 12px;
-            font-family: var(--font-ui);
-            cursor: pointer;
-            transition: all 0.2s;
-          }
-          .cp-edit-btn:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-          }
-
-          .cp-stats-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-          }
-          .cp-stat-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            box-shadow: var(--clay-shadow);
-            padding: 20px 22px;
-            position: relative;
-            overflow: hidden;
-          }
-          .cp-stat-accent {
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 3px;
-          }
-          .cp-stat-label {
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text3);
-            font-family: var(--font-ui);
-            margin-bottom: 8px;
-          }
-          .cp-stat-val {
-            font-family: var(--font-display);
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--text);
-          }
-          .cp-stat-val.empty {
-            font-size: 24px;
-            color: var(--text3);
-          }
-          .cp-stat-sub {
-            font-size: 11px;
-            color: var(--text3);
-            font-family: var(--font-ui);
-            margin-top: 4px;
-          }
-
-          .cp-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-          }
-          .cp-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            box-shadow: var(--clay-shadow);
-            overflow: hidden;
-          }
-          .cp-card-header {
-            padding: 16px 22px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
-          .cp-card-title {
-            font-family: var(--font-display);
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text);
-            margin: 0;
-          }
-          .cp-card-body {
-            padding: 22px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-          }
-
-          .cp-sec-label {
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text3);
-            font-family: var(--font-ui);
-            margin-bottom: 8px;
-          }
-
-          .cp-exp-pill {
-            background: var(--accent-dim);
-            color: var(--accent);
-            border: 1px solid var(--accent-glow);
-            border-radius: 20px;
-            padding: 5px 14px;
-            font-size: 13px;
-            font-weight: 500;
-            display: inline-block;
-          }
-          
-          .cp-tag-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-          }
-          .cp-tech-tag {
-            background: var(--bg2);
-            color: var(--text2);
-            border: 1px solid var(--border2);
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 12px;
-            font-family: var(--font-ui);
-          }
-          .cp-focus-tag {
-            background: var(--accent-dim);
-            color: var(--accent);
-            border: 1px solid var(--accent-glow);
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 12px;
-            font-family: var(--font-ui);
-          }
-          .cp-tag-edit {
-            cursor: pointer;
-            transition: all 0.2s;
-          }
-          .cp-tag-edit:hover {
-            opacity: 0.8;
-          }
-          .cp-tag-inactive {
-            background: transparent;
-            border: 1px solid var(--border2);
-            color: var(--text3);
-          }
-
-          .cp-target-txt {
-            font-size: 13px;
-            color: var(--text);
-            font-family: var(--font-body);
-          }
-          .cp-empty-txt {
-            font-size: 13px;
-            color: var(--text3);
-            font-style: italic;
-          }
-
-          .cp-edit-prompt {
-            padding: 40px 22px;
-            text-align: center;
-          }
-
-          .cp-input {
-            width: 100%;
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: 13px;
-            color: var(--text);
-            font-family: var(--font-body);
-            box-shadow: var(--clay-inset);
-            outline: none;
-            transition: all 0.2s;
-          }
-          .cp-input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 2px var(--accent-glow);
-          }
-          textarea.cp-input {
-            resize: vertical;
-            min-height: 80px;
-          }
-
-          .cp-save-btn {
-            background: var(--accent);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 18px;
-            font-size: 13px;
-            font-family: var(--font-ui);
-            cursor: pointer;
-            transition: all 0.2s;
-          }
-          .cp-save-btn:hover {
-            opacity: 0.9;
-          }
-          .cp-ghost-btn {
-            background: transparent;
-            color: var(--text2);
-            border: none;
-            padding: 8px 18px;
-            font-size: 13px;
-            font-family: var(--font-ui);
-            cursor: pointer;
-            transition: all 0.2s;
-          }
-          .cp-ghost-btn:hover {
-            color: var(--text);
-          }
-
-          .cp-session-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 16px;
-            background: var(--bg2);
-            border-radius: 10px;
-            border: 1px solid var(--border);
-          }
-          .cp-sess-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-          }
-          .cp-sess-ava {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--accent-dim);
-            color: var(--accent);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 700;
-          }
-          .cp-sess-name {
-             font-size: 14px;
-             font-weight: 600;
-             color: var(--text);
-          }
-          .cp-sess-meta {
-             font-size: 12px;
-             color: var(--text3);
-          }
-        `}</style>
-
+  // --------------------------------------------------------
+  // EXPERT VIEW RENDERING (Own Profile)
+  // --------------------------------------------------------
+  if (isExpert) {
+    return (
+      <PageLayout>
         <div style={{ paddingBottom: '40px' }}>
           
-          {/* PROFILE HEADER CARD */}
-          <div className="cp-header-card">
-            <div className="cp-header-top-accent" />
-            <div className="cp-header-inner">
-              <div className="cp-avatar">{initials}</div>
-              
-              <div className="cp-info-block">
-                <h1 className="cp-name">{profile.name}</h1>
-                <div className="cp-role-pill">
-                  {isExpert ? (profile.title || 'Expert') : (profile.targetRole || 'Candidate')}
-                </div>
-                <div className="cp-email">{profile.email}</div>
-              </div>
-
-              {!isEditing && (
-                <button className="cp-edit-btn" onClick={handleEditToggle}>Edit profile</button>
-              )}
-            </div>
-          </div>
-
-          {/* STATS ROW */}
-          <div className="cp-stats-row">
-            <motion.div className="cp-stat-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }}>
-              <div className="cp-stat-accent" style={{ background: 'var(--accent)' }} />
-              <div className="cp-stat-label">Sessions</div>
-              <div className="cp-stat-val">{stats.totalBookings}</div>
-              <div className="cp-stat-sub">Total completed</div>
-            </motion.div>
-
-            <motion.div className="cp-stat-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
-              <div className="cp-stat-accent" style={{ background: 'var(--green)' }} />
-              <div className="cp-stat-label">Tech score</div>
-              <div className={`cp-stat-val ${stats.avgTech === '-' ? 'empty' : ''}`}>{stats.avgTech === '-' ? '—' : stats.avgTech}</div>
-              <div className="cp-stat-sub">Average rating</div>
-            </motion.div>
-
-            <motion.div className="cp-stat-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
-              <div className="cp-stat-accent" style={{ background: '#4a90d9' }} />
-              <div className="cp-stat-label">Comm score</div>
-              <div className={`cp-stat-val ${stats.avgComm === '-' ? 'empty' : ''}`}>{stats.avgComm === '-' ? '—' : stats.avgComm}</div>
-              <div className="cp-stat-sub">Average rating</div>
-            </motion.div>
-          </div>
-
-          {/* TWO COLUMN LAYOUT */}
-          <div className="cp-grid">
+          {/* SECTION 1: EXPERT HERO */}
+          <motion.div 
+            className={`ep-hero-card ${dark ? 'dark' : 'light'}`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="ep-hero-texture" />
+            <div className="ep-hero-accent-bar" />
             
-            {/* LEFT CARD - Profile Details */}
-            <div className="cp-card">
-              <div className="cp-card-header">
-                <h3 className="cp-card-title">Profile details</h3>
-              </div>
-              <div className="cp-card-body">
-                
-                <div>
-                  <div className="cp-sec-label">Years of Experience</div>
-                  {profile.yearsOfExperience ? (
-                    <div className="cp-exp-pill">{profile.yearsOfExperience}</div>
-                  ) : (
-                    <span className="cp-empty-txt">Not specified</span>
-                  )}
+            <div className="ep-hero-content">
+              <div>
+                <div className="ep-hex-outer">
+                  <div className="ep-hex-initials">{initials}</div>
                 </div>
+                <div className="ep-verified-badge">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ marginRight: '4px' }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                  Verified Expert
+                </div>
+              </div>
 
-                <div>
-                  <div className="cp-sec-label">Tech Stack</div>
-                  <div className="cp-tag-row">
-                    {(profile.techStack || []).length > 0 ? (
-                      profile.techStack.map(t => <span key={t} className="cp-tech-tag">{t}</span>)
+              <div className="ep-info-main">
+                <h1 className="ep-info-name" style={{ color: dark ? '#f0ede4' : '#1a1610' }}>{profile.name}</h1>
+                <div className="ep-info-sub" style={{ color: dark ? 'var(--text2)' : '#4a453e' }}>{profile.title || 'Expert'} · {profile.company || 'RoundZero'}</div>
+                <div className="ep-domain-tags" style={{ marginTop: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {(profile.domains || []).map(d => <span key={d} className="cp-target-role-pill" style={{ fontSize: '11px', padding: '4px 12px' }}>{d}</span>)}
+                </div>
+                <p className="ep-info-bio" style={{ color: dark ? 'var(--text2)' : '#6b655a' }}>{profile.bio || 'Professional expert dedicated to helping candidates ace their interviews.'}</p>
+              </div>
+
+              <div className="ep-rating-block">
+                <div className="ep-rating-num">5.0</div>
+                <div className="ep-stars-row">★★★★★</div>
+                <div className="ep-rating-lbl">avg rating</div>
+                <div className="ep-hero-divider" />
+                <div className="ep-stats-grid-small">
+                  <div className="ep-stat-item-small">
+                    <span className="ep-stat-val-small">{stats.totalBookings}</span>
+                    <span className="ep-stat-lbl-small">Sessions</span>
+                  </div>
+                  <div className="ep-stat-item-small">
+                    <span className="ep-stat-val-small">100%</span>
+                    <span className="ep-stat-lbl-small">Response</span>
+                  </div>
+                </div>
+                <button className="ep-edit-btn-hero" onClick={handleEditToggle}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  Edit Profile
+                </button>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* SECTION 2: EXPERT METRIC CARDS */}
+          <div className="ep-metric-strip">
+            <motion.div className="ep-metric-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }} style={{ borderLeft: '4px solid var(--accent)' }}>
+              <div className="cp-stat-label">Sessions Conducted</div>
+              <div className="cp-stat-value">{stats.totalBookings}</div>
+              <div className="cp-stat-sub">Lifetime sessions</div>
+            </motion.div>
+            <motion.div className="ep-metric-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }}>
+              <div className="cp-stat-label">Tech Depth</div>
+              <div className="cp-stat-value">{profile.technicalDepth || 50}%</div>
+              <div className="ep-metric-bar-track">
+                <div className="ep-metric-bar-fill" style={{ width: `${profile.technicalDepth || 50}%` }} />
+              </div>
+            </motion.div>
+            <motion.div className="ep-metric-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
+              <div className="cp-stat-label">Comm Focus</div>
+              <div className="cp-stat-value">{profile.communicationFocus || 50}%</div>
+              <div className="ep-metric-bar-track">
+                <div className="ep-metric-bar-fill" style={{ width: `${profile.communicationFocus || 50}%` }} />
+              </div>
+            </motion.div>
+            <motion.div className="ep-metric-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.21 }}>
+              <div className="cp-stat-label">Pressure</div>
+              <div className="cp-stat-value">{profile.followUpPressure || 50}%</div>
+              <div className="ep-metric-bar-track">
+                <div className="ep-metric-bar-fill" style={{ width: `${profile.followUpPressure || 50}%` }} />
+              </div>
+            </motion.div>
+          </div>
+
+          {/* SECTION 3: TABBED CONTENT AREA */}
+          <div className="ep-tabs-card">
+            <div className="ep-tab-bar">
+              {['Available Sessions', 'Interview Style', 'Reviews'].map(tab => (
+                <button key={tab} className={`ep-tab-btn ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
+                  {tab}
+                </button>
+              ))}
+            </div>
+            
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key={activeTab}
+                className="ep-tab-content"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.2 }}
+              >
+                {activeTab === 'Available Sessions' && (
+                  <div>
+                    {slots.length === 0 ? (
+                      <div className="ep-empty" style={{ padding: '40px', textAlign: 'center' }}>
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.2, marginBottom: '12px' }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        <div style={{ color: 'var(--text3)' }}>No available slots found. Add slots in Availability page.</div>
+                      </div>
                     ) : (
-                      <span className="cp-empty-txt">Not specified</span>
+                      slots.map(slot => {
+                        const sTime = slot.startTime?.toDate ? slot.startTime.toDate() : new Date(slot.startTime);
+                        return (
+                          <div key={slot.id} className="ep-slot-row">
+                            <div className="ep-slot-date-block">
+                              <div className="ep-slot-day">{sTime.getDate()}</div>
+                              <div className="ep-slot-month">{sTime.toLocaleDateString('en-US', { month: 'short' })}</div>
+                            </div>
+                            <div className="ep-slot-v-line" />
+                            <div className="ep-slot-info-main">
+                              <div className="ep-slot-time-text">{sTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (60 mins)</div>
+                              <div className="ep-slot-row-meta">
+                                <span className="cp-tag" style={{ padding: '2px 8px', fontSize: '10px', background: 'var(--accent-dim)', color: 'var(--accent)', borderColor: 'transparent' }}>Live</span>
+                              </div>
+                            </div>
+                            <button className="ep-btn-book-ghost" onClick={() => navigate('/availability')}>Manage</button>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
-                </div>
-
-                {isExpert ? (
-                  <>
-                    <div>
-                      <div className="cp-sec-label">Current Company</div>
-                      {profile.company ? (
-                        <div className="cp-target-txt">{profile.company}</div>
-                      ) : (
-                        <span className="cp-empty-txt">Not specified</span>
-                      )}
-                    </div>
-                    <div>
-                      <div className="cp-sec-label">Bio</div>
-                      {profile.bio ? (
-                        <div className="cp-target-txt" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{profile.bio}</div>
-                      ) : (
-                        <span className="cp-empty-txt">Not specified</span>
-                      )}
-                    </div>
-                    <div>
-                      <div className="cp-sec-label">Expertise Domains</div>
-                      <div className="cp-tag-row">
-                        {(profile.domains || []).length > 0 ? (
-                          profile.domains.map(d => <span key={d} className="cp-focus-tag">{d}</span>)
-                        ) : (
-                          <span className="cp-empty-txt">Not specified</span>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <div className="cp-sec-label">Interview Focus</div>
-                      <div className="cp-tag-row">
-                        {(profile.interviewFocus || []).length > 0 ? (
-                          profile.interviewFocus.map(f => <span key={f} className="cp-focus-tag">{f}</span>)
-                        ) : (
-                          <span className="cp-empty-txt">Not specified</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="cp-sec-label">Target Companies</div>
-                      {profile.targetCompanies ? (
-                        <div className="cp-target-txt">{profile.targetCompanies}</div>
-                      ) : (
-                        <span className="cp-empty-txt">Not specified</span>
-                      )}
-                    </div>
-                  </>
                 )}
 
-              </div>
-            </div>
+                {activeTab === 'Interview Style' && (
+                  <div className="ep-style-section">
+                    <div className="ep-section-lbl-muted">How I conduct interviews</div>
+                    
+                    {[
+                      { label: 'Technical Depth', val: profile.technicalDepth, desc: 'How deep we go into systems and code' },
+                      { label: 'Communication Focus', val: profile.communicationFocus, desc: 'Weight given to soft skills and clarity' },
+                      { label: 'Follow-up Pressure', val: profile.followUpPressure, desc: 'Frequency and intensity of cross-questioning' }
+                    ].map(style => (
+                      <div key={style.label} className="ep-style-bar-group">
+                        <div className="ep-style-bar-header">
+                          <span className="ep-style-bar-label">{style.label}</span>
+                          <span className="ep-style-bar-pct">{style.val || 50}%</span>
+                        </div>
+                        <div className="ep-style-bar-desc">{style.desc}</div>
+                        <div className="cp-stat-progress-track">
+                          <div className="ep-style-bar-fill" style={{ width: `${style.val || 50}%` }} />
+                        </div>
+                      </div>
+                    ))}
 
-            {/* RIGHT CARD - Edit Mode */}
-            <div className="cp-card">
-              <div className="cp-card-header">
-                <h3 className="cp-card-title">Edit profile</h3>
-                {isEditing && (
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <AnimatePresence>
-                      {successMsg && (
-                        <motion.span initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} style={{ color: 'var(--green)', fontSize: '13px', fontFamily: 'var(--font-ui)' }}>
-                          {successMsg}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                    <button className="cp-ghost-btn" onClick={handleEditToggle} disabled={saving}>Cancel</button>
-                    <button className="cp-save-btn" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-                  </div>
-                )}
-              </div>
-              
-              {!isEditing ? (
-                <div className="cp-edit-prompt">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, margin: '0 auto 10px auto', display: 'block' }}>
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                  </svg>
-                  <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Click Edit profile to update your details</div>
-                </div>
-              ) : (
-                <div className="cp-card-body">
-                  
-                  <div>
-                    <div className="cp-sec-label">Name</div>
-                    <input className="cp-input" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
-                  </div>
-
-                  {isExpert && (
-                    <div>
-                      <div className="cp-sec-label">Title</div>
-                      <input className="cp-input" value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Senior Software Engineer" />
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="cp-sec-label">Years of Experience</div>
-                    <div className="cp-tag-row">
-                      {(isExpert ? EXPERT_EXP_OPTIONS : CAND_EXP_OPTIONS).map(exp => (
-                        <span key={exp} onClick={() => setFormData({...formData, yearsOfExperience: exp})} className={`cp-exp-pill cp-tag-edit ${formData.yearsOfExperience === exp ? '' : 'cp-tag-inactive'}`}>{exp}</span>
+                    <div className="ep-section-lbl-muted" style={{ marginTop: '24px' }}>In my sessions</div>
+                    <div className="cp-chips-row">
+                      {['Real-world problems', 'Detailed feedback', 'System Design focus', 'High pressure', 'Collaborative'].map(tag => (
+                        <span key={tag} className="ep-expectation-chip">{tag}</span>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  <div>
-                    <div className="cp-sec-label">Tech Stack</div>
-                    <div className="cp-tag-row">
-                      {TECH_OPTS.map(opt => (
-                        <span key={opt} onClick={() => setFormData({...formData, techStack: toggleArrayItem(formData.techStack || [], opt)})} className={`cp-tech-tag cp-tag-edit ${(formData.techStack || []).includes(opt) ? '' : 'cp-tag-inactive'}`}>{opt}</span>
-                      ))}
-                    </div>
+                {activeTab === 'Reviews' && (
+                  <div className="ep-reviews-section">
+                    {reviews.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '40px' }}>No reviews yet — complete sessions to receive candidate reviews</div>
+                    ) : (
+                      reviews.map(rev => (
+                        <div key={rev.id} className="ep-review-card">
+                          <div className="ep-quote-mark">“</div>
+                          <div className="ep-review-content">
+                             <div className="ep-review-top-row">
+                               <div className="ep-review-ava">{rev.candidateName?.[0] || 'C'}</div>
+                               <div>
+                                 <div className="ep-review-name">{rev.candidateName || 'Candidate'}</div>
+                                 <div className="ep-review-role">Targeting {rev.targetRole || 'Engineer'}</div>
+                               </div>
+                               <div className="ep-review-stars-row">★★★★★</div>
+                             </div>
+                             <p className="ep-review-body-text">{rev.comment || rev.feedbackText || 'Excellent interviewer, provided actionable feedback.'}</p>
+                             <div className="ep-review-date">{rev.createdAt?.toDate ? rev.createdAt.toDate().toLocaleDateString() : 'Recent'}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
-
-                  {isExpert ? (
-                    <>
-                      <div>
-                        <div className="cp-sec-label">Current Company</div>
-                        <input className="cp-input" value={formData.company || ''} onChange={e => setFormData({...formData, company: e.target.value})} placeholder="e.g. Stripe, AWS" />
-                      </div>
-                      <div>
-                        <div className="cp-sec-label">Expertise Domains</div>
-                        <div className="cp-tag-row">
-                          {DOMAIN_OPTS.map(opt => (
-                            <span key={opt} onClick={() => setFormData({...formData, domains: toggleArrayItem(formData.domains || [], opt)})} className={`cp-focus-tag cp-tag-edit ${(formData.domains || []).includes(opt) ? '' : 'cp-tag-inactive'}`}>{opt}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="cp-sec-label">Bio</div>
-                        <textarea className="cp-input" value={formData.bio || ''} onChange={e => setFormData({...formData, bio: e.target.value})} placeholder="Short bio about yourself..." />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <div className="cp-sec-label">Interview Focus</div>
-                        <div className="cp-tag-row">
-                          {FOCUS_OPTS.map(focus => (
-                            <span key={focus} onClick={() => setFormData({...formData, interviewFocus: toggleArrayItem(formData.interviewFocus || [], focus)})} className={`cp-focus-tag cp-tag-edit ${(formData.interviewFocus || []).includes(focus) ? '' : 'cp-tag-inactive'}`}>{focus}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="cp-sec-label">Target Companies</div>
-                        <input className="cp-input" value={formData.targetCompanies || ''} onChange={e => setFormData({...formData, targetCompanies: e.target.value})} placeholder="e.g. Google, Stripe, Atlassian" />
-                      </div>
-                    </>
-                  )}
-
-                </div>
-              )}
-            </div>
-
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
-          {/* RECENT SESSIONS SECTION */}
-          <div className="cp-card" style={{ marginTop: '24px' }}>
-            <div className="cp-card-header">
-              <h3 className="cp-card-title">Recent Past Sessions</h3>
-              <button onClick={() => navigate('/past-sessions')} className="cp-edit-btn" style={{ margin: 0 }}>View all</button>
-            </div>
-            <div className="cp-card-body" style={{ gap: '12px' }}>
-              {recentSessions.length === 0 ? (
-                <div className="cp-empty-txt" style={{ textAlign: 'center', padding: '20px 0' }}>No past sessions found yet.</div>
-              ) : (
-                recentSessions.map(sess => {
-                  const sInitials = sess.expertName.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
-                  const sDate = sess.startTime?.toDate ? sess.startTime.toDate() : new Date(sess.startTime);
-                  return (
-                    <div key={sess.id} className="cp-session-item">
-                       <div className="cp-sess-info">
-                         <div className="cp-sess-ava">{sInitials}</div>
+          {/* SECTION 4: RECENT SESSIONS */}
+          <div className="cp-sessions-card">
+             <div className="cp-sessions-header">
+                <h3 className="cp-sessions-title">Recent Sessions</h3>
+                <span onClick={() => navigate('/past-sessions')} className="cp-view-all">View all →</span>
+             </div>
+             {recentSessions.length === 0 ? (
+                <div className="cp-empty-state">
+                  <div className="cp-empty-emoji">🚀</div>
+                  <div className="cp-empty-title">Your journey starts here</div>
+                  <div className="cp-empty-sub">Interview candidates to build your history</div>
+                </div>
+             ) : (
+                <div className="cp-sessions-timeline">
+                  {recentSessions.map(sess => (
+                    <div key={sess.id} className="cp-session-cell">
+                       <div className="cp-sess-expert">
+                         <div className="cp-sess-avatar">{sess.otherName?.[0]}</div>
                          <div>
-                           <div className="cp-sess-name">{sess.expertName}</div>
-                           <div className="cp-sess-meta">{sess.expertTitle} · {sDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                           <div className="cp-sess-name">{sess.otherName}</div>
+                           <div className="cp-sess-role">{sess.otherTitle}</div>
                          </div>
                        </div>
-                       <div style={{ color: 'var(--green)', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Completed</div>
+                       <div className="cp-sess-date">{new Date(sess.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                       <div className="cp-sess-bottom">
+                         <span className="cp-status-pill">Completed</span>
+                         <span className="cp-sess-score" style={{ color: 'var(--green)' }}>9.0</span>
+                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  ))}
+                </div>
+             )}
           </div>
 
+          {/* EDIT OVERLAY */}
+          <AnimatePresence>
+            {isEditing && (
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+              >
+                <motion.div 
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.9, y: 20 }}
+                  style={{ background: 'var(--surface)', width: '100%', maxWidth: '600px', borderRadius: '18px', padding: '32px', position: 'relative', border: '1px solid var(--border)' }}
+                >
+                   <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: '24px' }}>Edit Expert Profile</h2>
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '10px' }}>
+                      <div>
+                        <label className="cp-section-label">Name</label>
+                        <input className="cp-input" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="cp-section-label">Professional Title</label>
+                        <input className="cp-input" value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="cp-section-label">Expertise Domains</label>
+                        <div className="cp-chips-row">
+                          {DOMAIN_OPTS.map(d => (
+                            <span key={d} onClick={() => setFormData({...formData, domains: toggleArrayItem(formData.domains || [], d)})} className={`cp-chip ${formData.domains?.includes(d) ? '' : 'cp-tag-inactive'}`} style={{ cursor: 'pointer' }}>{d}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="cp-section-label">Bio</label>
+                        <textarea className="cp-input" value={formData.bio || ''} onChange={e => setFormData({...formData, bio: e.target.value})} style={{ minHeight: '100px' }} />
+                      </div>
+                      <div>
+                         <label className="cp-section-label">Interview Style</label>
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {['technicalDepth', 'communicationFocus', 'followUpPressure'].map(key => (
+                              <div key={key}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                                  <span>{key === 'technicalDepth' ? 'Tech Depth' : key === 'communicationFocus' ? 'Comm Focus' : 'Pressure'}</span>
+                                  <span>{formData[key] || 50}%</span>
+                                </div>
+                                <input type="range" style={{ width: '100%' }} value={formData[key] || 50} onChange={e => setFormData({...formData, [key]: parseInt(e.target.value)})} />
+                              </div>
+                            ))}
+                         </div>
+                      </div>
+                   </div>
+                   <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
+                     <button className="cp-save-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</button>
+                     <button className="cp-ghost-btn" style={{ flex: 1 }} onClick={handleEditToggle}>Cancel</button>
+                   </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
         </div>
-      </motion.div>
+      </PageLayout>
+    );
+  }
+
+  // --------------------------------------------------------
+  // CANDIDATE VIEW RENDERING
+  // --------------------------------------------------------
+  const avgScore = ((stats.avgTech !== '-' ? parseFloat(stats.avgTech) : 0) + (stats.avgComm !== '-' ? parseFloat(stats.avgComm) : 0)) / 2;
+  const readinessPercent = Math.round(avgScore * 10);
+
+  return (
+    <PageLayout>
+      <div style={{ paddingBottom: '40px' }}>
+        
+        {/* SECTION 1: HERO BANNER */}
+        <motion.div 
+          className={`cp-hero-banner ${dark ? 'dark' : 'light'}`}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <div className="cp-hero-watermark">R0</div>
+          <div className="cp-hero-line" />
+          
+          <div className="cp-hero-content">
+            <div className="cp-hero-avatar">{initials}</div>
+            <div className="cp-hero-info">
+              <h1 className="cp-hero-name" style={{ color: dark ? '#f0ede4' : '#1a1610' }}>{profile.name}</h1>
+              <div className="cp-hero-role">{profile.targetRole || 'Software Engineering Candidate'}</div>
+              <div className="cp-hero-email">{profile.email}</div>
+            </div>
+            
+            <div className="cp-hero-right">
+              <div className="cp-readiness-wrapper">
+                <div className="cp-readiness-circle">
+                  <svg width="72" height="72" viewBox="0 0 72 72">
+                    <circle
+                      cx="36" cy="36" r="30"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.08)"
+                      strokeWidth="5"
+                    />
+                    <motion.circle 
+                      cx="36" cy="36" r="30"
+                      fill="none"
+                      stroke={readinessPercent > 70 ? '#4a9e6e' : readinessPercent > 40 ? '#c4882a' : '#c0473a'}
+                      strokeWidth="5"
+                      strokeLinecap="round"
+                      strokeDasharray="188.5"
+                      initial={{ strokeDashoffset: "188.5" }}
+                      animate={{ strokeDashoffset: 188.5 - (readinessPercent / 100 * 188.5) }}
+                      transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
+                      transform="rotate(-90 36 36)"
+                    />
+                    <text
+                      x="36" y="36"
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fill={dark ? '#f0ede4' : '#1a1610'}
+                      fontSize="14"
+                      fontFamily="Playfair Display, serif"
+                      fontWeight="700"
+                    >
+                      {readinessPercent}%
+                    </text>
+                  </svg>
+                </div>
+                <div className="cp-readiness-label">Ready</div>
+              </div>
+              <button className="cp-btn-edit-ghost" onClick={handleEditToggle}>Edit profile</button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* SECTION 2: STATS STRIP */}
+        <div className="cp-stats-strip">
+           <motion.div className="cp-stat-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }} style={{ borderLeft: '4px solid var(--accent)' }}>
+             <div className="cp-stat-label">Sessions</div>
+             <div className="cp-stat-value">{stats.totalBookings}</div>
+             <div className="cp-stat-sub">Total completed</div>
+           </motion.div>
+           <motion.div className="cp-stat-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} style={{ borderLeft: '4px solid #4a90d9' }}>
+             <div className="cp-stat-label">Tech Score</div>
+             <div className="cp-stat-value">{stats.avgTech === '-' ? '0.0' : stats.avgTech}</div>
+             <div className="cp-stat-sub">Average rating</div>
+           </motion.div>
+           <motion.div className="cp-stat-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }} style={{ borderLeft: '4px solid var(--green)' }}>
+             <div className="cp-stat-label">Comm Score</div>
+             <div className="cp-stat-value">{stats.avgComm === '-' ? '0.0' : stats.avgComm}</div>
+             <div className="cp-stat-sub">Average rating</div>
+           </motion.div>
+           <motion.div className="cp-stat-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.21 }} style={{ borderLeft: '4px solid var(--amber)' }}>
+             <div className="cp-stat-label">Sessions to Goal</div>
+             <div className="cp-stat-value">{stats.totalBookings}/10</div>
+             <div className="cp-stat-progress-track">
+                <div className="cp-stat-progress-fill" style={{ width: `${Math.min((stats.totalBookings / 10) * 100, 100)}%` }} />
+             </div>
+           </motion.div>
+        </div>
+
+        {/* SECTION 3: THREE COLUMN GRID */}
+        <div className="cp-main-grid">
+           
+           {/* COLUMN 1: TARGETS */}
+           <div className="cp-grid-card">
+              <div className="cp-grid-header">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                <h3 className="cp-grid-title">My Targets</h3>
+              </div>
+              <div className="cp-grid-body">
+                 <div>
+                   <div className="cp-section-label">Targeting</div>
+                   <div className="cp-target-role-pill">{profile.targetRole || 'Software Engineer'}</div>
+                 </div>
+                 <div>
+                   <div className="cp-section-label">Target Companies</div>
+                   <div className="cp-chips-row">
+                     {(profile.targetCompanies || '').split(',').map(c => c.trim()).filter(c => c).map(company => (
+                       <span key={company} className="cp-chip">
+                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="22" x2="9" y2="18"></line><line x1="15" y1="22" x2="15" y2="18"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+                         {company}
+                       </span>
+                     ))}
+                     {(!profile.targetCompanies) && <span className="cp-chip" style={{ opacity: 0.5 }}>No companies added</span>}
+                   </div>
+                 </div>
+                 <div>
+                    <div className="cp-section-label">Interview Focus</div>
+                    <div className="cp-focus-list">
+                       {(profile.interviewFocus || []).map(f => (
+                         <div key={f} className="cp-focus-item">
+                           <span style={{ color: 'var(--accent)', fontWeight: 700 }}>✓</span>
+                           {f}
+                         </div>
+                       ))}
+                       {(!profile.interviewFocus || profile.interviewFocus.length === 0) && <span style={{ fontSize: '12px', color: 'var(--text3)' }}>No focus areas set</span>}
+                    </div>
+                 </div>
+              </div>
+           </div>
+
+           {/* COLUMN 2: TECH STACK */}
+           <div className="cp-grid-card">
+              <div className="cp-grid-header">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                <h3 className="cp-grid-title">My Stack</h3>
+              </div>
+              <div className="cp-grid-body">
+                 <div className="cp-chips-row">
+                    {(profile.techStack || []).map(t => (
+                      <span key={t} style={{
+                        ...getTagStyle(t),
+                        borderRadius: '20px',
+                        padding: '5px 12px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        fontFamily: 'DM Sans, sans-serif'
+                      }}>
+                        {t}
+                      </span>
+                    ))}
+                    {(!profile.techStack || profile.techStack.length === 0) && <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Add your stack for better matching</span>}
+                 </div>
+                 <div className="cp-exp-section">
+                    <div className="cp-section-label">Experience Level</div>
+                    <div className="cp-target-role-pill" style={{ marginTop: '6px', fontSize: '13px', padding: '6px 14px' }}>{profile.yearsOfExperience || 'Fresher'}</div>
+                 </div>
+              </div>
+           </div>
+
+           {/* COLUMN 3: EDIT PANEL */}
+           <div className="cp-grid-card">
+              <div className="cp-grid-header">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                <h3 className="cp-grid-title">Edit Profile</h3>
+                {isEditing && (
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                    <button className="cp-save-btn" onClick={handleSave} style={{ fontSize: '11px', padding: '4px 12px' }}>Save</button>
+                    <button className="cp-ghost-btn" onClick={handleEditToggle} style={{ fontSize: '11px', padding: '4px 12px' }}>Cancel</button>
+                  </div>
+                )}
+              </div>
+              <div className="cp-grid-body">
+                 {!isEditing ? (
+                   <div className="cp-edit-panel-empty">
+                      <svg className="cp-edit-illustration" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                      <div className="cp-edit-title">Update your profile</div>
+                      <div className="cp-edit-desc">Keep your targets and stack current for better expert matching</div>
+                      <button className="cp-btn-edit-ghost" style={{ marginTop: '20px' }} onClick={handleEditToggle}>Modify Details</button>
+                   </div>
+                 ) : (
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <label className="cp-section-label">Target Role</label>
+                        <input className="cp-input" value={formData.targetRole || ''} onChange={e => setFormData({...formData, targetRole: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="cp-section-label">Tech Stack</label>
+                        <div className="cp-chips-row">
+                           {TECH_OPTS.map(opt => (
+                             <span key={opt} onClick={() => setFormData({...formData, techStack: toggleArrayItem(formData.techStack || [], opt)})} className={`cp-chip ${formData.techStack?.includes(opt) ? '' : 'cp-tag-inactive'}`} style={{ cursor: 'pointer' }}>{opt}</span>
+                           ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="cp-section-label">Interview Focus</label>
+                        <div className="cp-chips-row">
+                           {FOCUS_OPTS.map(opt => (
+                             <span key={opt} onClick={() => setFormData({...formData, interviewFocus: toggleArrayItem(formData.interviewFocus || [], opt)})} className={`cp-chip ${formData.interviewFocus?.includes(opt) ? '' : 'cp-tag-inactive'}`} style={{ cursor: 'pointer' }}>{opt}</span>
+                           ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="cp-section-label">Target Companies</label>
+                        <input className="cp-input" value={formData.targetCompanies || ''} onChange={e => setFormData({...formData, targetCompanies: e.target.value})} placeholder="Apple, Google, etc." />
+                      </div>
+                   </div>
+                 )}
+              </div>
+           </div>
+        </div>
+
+        {/* SECTION 4: RECENT SESSIONS */}
+        <div className="cp-sessions-card">
+           <div className="cp-sessions-header">
+              <h3 className="cp-sessions-title">Recent Sessions</h3>
+              <span onClick={() => navigate('/past-sessions')} className="cp-view-all">View all →</span>
+           </div>
+           {recentSessions.length === 0 ? (
+              <div className="cp-empty-state">
+                <div className="cp-empty-emoji">🚀</div>
+                <div className="cp-empty-title">Your journey starts here</div>
+                <div className="cp-empty-sub">Book your first mock interview</div>
+                <button className="cp-empty-btn" onClick={() => navigate('/explore')}>Find an Expert →</button>
+              </div>
+           ) : (
+              <div className="cp-sessions-timeline">
+                {recentSessions.map(sess => (
+                  <div key={sess.id} className="cp-session-cell">
+                     <div className="cp-sess-expert">
+                       <div className="cp-sess-avatar">{sess.otherName?.[0]}</div>
+                       <div>
+                         <div className="cp-sess-name">{sess.otherName}</div>
+                         <div className="cp-sess-role">{sess.otherTitle}</div>
+                       </div>
+                     </div>
+                     <div className="cp-sess-date">{new Date(sess.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                     <div className="cp-sess-bottom">
+                       <span className="cp-status-pill">Completed</span>
+                       <span className="cp-sess-score" style={{ color: 'var(--green)' }}>{sess.technicalScore ? ((sess.technicalScore + sess.communicationScore)/2).toFixed(1) : '9.0'}</span>
+                     </div>
+                  </div>
+                ))}
+              </div>
+           )}
+        </div>
+
+      </div>
     </PageLayout>
   );
 }
