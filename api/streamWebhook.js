@@ -106,7 +106,7 @@ export default async function handler(req, res) {
 
     const bookingDoc = snapshot.docs[0];
     const bookingId = bookingDoc.id;
-    const { roleDescription } = bookingDoc.data();
+    const { roleDescription, candidateUid, expertUid } = bookingDoc.data();
 
     // Step 5: Parallel fetch
     const [transcriptRes, feedbackSnap] = await Promise.all([
@@ -127,35 +127,65 @@ export default async function handler(req, res) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `You are evaluating a software engineering mock interview for the role: ${roleDescription || 'Software Engineer'}.
+    let roleDomain = "Software Engineering";
+    const rd = (roleDescription || "").toLowerCase();
+    if (rd.includes("frontend") || rd.includes("react") || rd.includes("ui")) roleDomain = "Frontend Engineering";
+    else if (rd.includes("backend") || rd.includes("node") || rd.includes("java") || rd.includes("python")) roleDomain = "Backend Engineering";
+    else if (rd.includes("cyber") || rd.includes("security") || rd.includes("infosec")) roleDomain = "Cybersecurity";
+    else if (rd.includes("data") || rd.includes("ml") || rd.includes("machine learning") || rd.includes("ai")) roleDomain = "Data Science / ML";
+    else if (rd.includes("devops") || rd.includes("cloud") || rd.includes("infra")) roleDomain = "DevOps / Infrastructure";
+    else if (rd.includes("mobile") || rd.includes("ios") || rd.includes("android")) roleDomain = "Mobile Engineering";
 
-You have two inputs:
-1. INTERVIEW TRANSCRIPT — the full conversation between interviewer and candidate.
-2. EXPERT SCORECARD — star ratings (1–5) and notes the interviewer entered live during the session.
+    const prompt = `You are a world-class senior interviewer and hiring committee member 
+at a top-tier tech company, specialising in ${roleDomain} roles. 
+Your role: ${roleDescription || 'Software Engineer'}.
 
-Expert Scorecard:
+You have just reviewed a technical interview. Your job is to produce 
+a brutally honest, precise, experience-level-appropriate evaluation 
+that would hold up in a real hiring committee review.
+
+EXPERT SCORECARD (filled by the human interviewer during the session):
 - Communication: ${expertScorecard.communication || 0}/5 — Notes: "${expertScorecard.notes?.communication || 'none'}"
-- Problem Solving: ${expertScorecard.problemSolving || 0}/5 — Notes: "${expertScorecard.notes?.problemSolving || 'none'}"
+- Problem Solving: ${expertScorecard.problemSolving || 0}/5 — Notes: "${expertScorecard.notes?.problemSolving || 'none'}"  
 - Code Quality: ${expertScorecard.codeQuality || 0}/5 — Notes: "${expertScorecard.notes?.codeQuality || 'none'}"
 - Edge Cases: ${expertScorecard.edgeCases || 0}/5 — Notes: "${expertScorecard.notes?.edgeCases || 'none'}"
-- Approaches Discussed: ${expertScorecard.approaches || 0}/5 — Notes: "${expertScorecard.notes?.approaches || 'none'}"
+- Approaches: ${expertScorecard.approaches || 0}/5 — Notes: "${expertScorecard.notes?.approaches || 'none'}"
 - Concept Clarity: ${expertScorecard.conceptClarity || 0}/5 — Notes: "${expertScorecard.notes?.conceptClarity || 'none'}"
 - Expert Overall Score: ${expertScorecard.overallScore || 0}/10
+- Expert Notes: "${expertScorecard.notes?.overall || 'none'}"
 
-Interview Transcript:
+FULL INTERVIEW TRANSCRIPT:
 ${transcriptText}
 
-Based on BOTH the transcript and the expert's live scorecard, return ONLY a valid JSON object 
-with no markdown, no preamble, no explanation. Exactly this shape:
+Based on the transcript evidence and expert scorecard above, return 
+ONLY a valid JSON object (no markdown, no preamble, no explanation) 
+with exactly these fields:
+
 {
-  "overallScore": <number 0–10, corroborate expert's overall with transcript evidence>,
-  "technicalScore": <number 0–10>,
-  "communicationScore": <number 0–10>,
-  "summary": "<2–3 sentences in third person summarising the candidate's performance>",
-  "strengths": ["<specific strength from transcript>", "<second strength>", "<third strength>"],
-  "improvements": ["<specific area to improve>", "<second area>", "<third area>"],
-  "expertCorroboration": "<1 sentence: did the transcript support the expert's ratings? note any discrepancies>"
-}`;
+  "overallRating": "Excellent" | "Good" | "Needs Work" | "Poor",
+  "recommendation": "STRONG HIRE" | "HIRE" | "BORDERLINE" | "NO HIRE",
+  "overallScore": number 1-10,
+  "technicalScore": number 1-10,
+  "communicationScore": number 1-10,
+  "problemSolvingScore": number 1-10,
+  "summary": "3-4 sentence overall narrative. Use the candidate's first name if detectable from transcript. Be specific, not generic.",
+  "technical": "2-3 sentences. Cite specific questions or moments from the transcript. Name exact concepts they got right or wrong.",
+  "communication": "2-3 sentences. How did they structure answers? Did they think out loud? Any red flags?",
+  "problemSolving": "2-3 sentences. How did they approach unfamiliar problems? Did they ask clarifying questions?",
+  "codeQuality": "2-3 sentences. Comment on readability, edge case handling, efficiency. Skip if no coding occurred.",
+  "strengths": ["specific strength 1", "specific strength 2", "specific strength 3"],
+  "improvements": ["specific improvement 1", "specific improvement 2", "specific improvement 3"],
+  "flaws": ["honest critical flaw 1", "honest critical flaw 2"],
+  "roadmap": ["concrete study/practice action 1", "concrete study/practice action 2", "concrete study/practice action 3"],
+  "expertCorroboration": "1 sentence: does transcript evidence support or challenge the expert's ratings? Be specific."
+}
+
+Rules:
+- Be specific. Reference actual transcript moments, not generic advice.
+- Match depth to the role: SWE → focus on CS fundamentals + system design. Cybersecurity → focus on threat modelling + tooling. Frontend → focus on browser APIs + performance. Data → focus on stats + ML fundamentals.
+- Do not inflate scores. A score of 7+ should require demonstrated depth, not just surface-level answers.
+- flaws should be honest — things that would actually concern a hiring manager, not softened versions of improvements.
+- roadmap should be actionable: specific topics, resources, or practice patterns — not vague advice like "practice more".`;
 
     let parsedAI = {
       isHardcoded: false,
@@ -181,6 +211,8 @@ with no markdown, no preamble, no explanation. Exactly this shape:
     // Step 7: Write to Firestore feedback/{bookingId}
     await db.collection("feedback").doc(bookingId).set({
       ...parsedAI,
+      candidateUid,
+      expertUid,
       isHardcoded: false,
       gradedBy: parsedAI.gradedBy || "gemini",
       gradedAt: FieldValue.serverTimestamp()

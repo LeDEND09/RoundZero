@@ -14,6 +14,8 @@ const BookingPage = React.lazy(() => import('./pages/BookingPage'))
 const RoomPage = React.lazy(() => import('./pages/RoomPage'))
 const UpcomingSessionsPage = React.lazy(() => import('./pages/UpcomingSessionsPage'))
 const PastSessionsPage = React.lazy(() => import('./pages/PastSessionsPage'))
+const FeedbackReportPage = React.lazy(() => import('./pages/FeedbackReportPage'))
+const ReportsPage = React.lazy(() => import('./pages/ReportsPage'))
 
 function LoadingScreen() {
   return (
@@ -68,7 +70,8 @@ function AppRoutes() {
           <Route path="/room/:callId" element={<RoomPage />} />
           <Route path="/upcoming" element={<UpcomingSessionsPage />} />
           <Route path="/past-sessions" element={<PastSessionsPage />} />
-          <Route path="/reports" element={<Placeholder name="Feedback Reports" />} />
+          <Route path="/feedback/:bookingId" element={<FeedbackReportPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<Placeholder name="Settings" />} />
         </Routes>
       </Suspense>

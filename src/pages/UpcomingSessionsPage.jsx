@@ -231,7 +231,9 @@ export default function UpcomingSessionsPage() {
                                <div className="time-block">
                                  <div className="tb-time">{b.parsedStartTime.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})}</div>
                                  <div className="tb-date">{b.parsedStartTime.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'})}</div>
-                                 <div className="dur-pill">60 min</div>
+                                 <div className="dur-pill">
+                                   {b.endTime ? Math.round(((b.endTime?.toDate ? b.endTime.toDate() : new Date(b.endTime)) - b.parsedStartTime) / 60000) : 60} min
+                                 </div>
                                </div>
 
                                <div className="info-block">

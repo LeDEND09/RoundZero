@@ -36,38 +36,71 @@ export default function Topbar() {
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
   useEffect(() => {
+    let unsubAuth = () => {}
     let unsubUser = () => {}
     let unsubBookings = () => {}
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
-      if (u) {
-        setUser(u)
-        unsubUser = onSnapshot(doc(db, 'users', u.uid), (snap) => {
-          if (snap.exists()) {
-            const userRole = snap.data().role
-            setRole(userRole)
-            setProfileName(snap.data().name || 'User')
+    let lastRole = null
+    let lastUid = null
 
-            // Query only this user's bookings to satisfy participant-only rules.
-            const roleKey = userRole === 'expert' ? 'expertUid' : 'candidateUid'
-            unsubBookings()
-            unsubBookings = onSnapshot(
-              query(collection(db, 'bookings'), where(roleKey, '==', u.uid)),
-              (bookingSnap) => {
-                const now = new Date()
-                let count = 0
-                bookingSnap.forEach(d => {
-                  const b = d.data()
-                  const t = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime)
-                  if (b.status === 'confirmed' && t > now) count++
-                })
-                setUpcomingCount(count)
+    unsubAuth = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        if (u.uid !== lastUid) {
+          lastUid = u.uid
+          setUser(u)
+
+          // Cleanup previous user listener if any
+          unsubUser()
+          unsubUser = onSnapshot(doc(db, 'users', u.uid), (snap) => {
+            if (snap.exists()) {
+              const data = snap.data()
+              const userRole = data.role
+              setRole(userRole)
+              setProfileName(data.name || 'User')
+
+              // Only re-subscribe to bookings if the role changed
+              if (userRole !== lastRole) {
+                lastRole = userRole
+                const roleKey = userRole === 'expert' ? 'expertUid' : 'candidateUid'
+                
+                unsubBookings()
+                unsubBookings = onSnapshot(
+                  query(collection(db, 'bookings'), where(roleKey, '==', u.uid)),
+                  (bookingSnap) => {
+                    const now = new Date()
+                    let count = 0
+                    bookingSnap.forEach(d => {
+                      const b = d.data()
+                      const t = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime)
+                      if (b.status === 'confirmed' && t > now) count++
+                    })
+                    setUpcomingCount(count)
+                  },
+                  (err) => console.error("Topbar bookings listen error:", err)
+                )
               }
-            )
-          }
-        })
+            }
+          }, (err) => console.error("Topbar user listen error:", err))
+        }
+      } else {
+        // Logout cleanup
+        unsubUser()
+        unsubUser = () => {}
+        unsubBookings()
+        unsubBookings = () => {}
+        setUser(null)
+        setRole(null)
+        setProfileName('')
+        setUpcomingCount(0)
+        lastUid = null
+        lastRole = null
       }
     })
-    return () => { unsubAuth(); unsubUser(); unsubBookings() }
+
+    return () => {
+      unsubAuth()
+      unsubUser()
+      unsubBookings()
+    }
   }, [])
 
   const handleLogout = async () => {

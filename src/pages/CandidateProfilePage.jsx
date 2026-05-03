@@ -336,7 +336,7 @@ export default function CandidateProfilePage() {
                             </div>
                             <div className="ep-slot-v-line" />
                             <div className="ep-slot-info-main">
-                              <div className="ep-slot-time-text">{sTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (60 mins)</div>
+                              <div className="ep-slot-time-text">{sTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} ({slot.durationMinutes || 60} mins)</div>
                               <div className="ep-slot-row-meta">
                                 <span className="cp-tag" style={{ padding: '2px 8px', fontSize: '10px', background: 'var(--accent-dim)', color: 'var(--accent)', borderColor: 'transparent' }}>Live</span>
                               </div>

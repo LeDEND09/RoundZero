@@ -59,20 +59,33 @@ function ScoreBar({ label, score, colorClass }) {
 }
 
 /* ── Expanded scorecard ── */
-function Scorecard({ bookingId, initialFeedback }) {
+function Scorecard({ bookingId, initialFeedback, isLoading }) {
   const [feedback, setFeedback] = useState(initialFeedback);
   const [showTranscript, setShowTranscript] = useState(false);
 
+  // Sync whenever the parent's cache delivers new data (e.g. after getDoc resolves)
   useEffect(() => {
-    if (isFeedbackReady(feedback) || feedback?.status === 'error') return;
+    setFeedback(initialFeedback);
+  }, [initialFeedback]);
 
-    const unsub = onSnapshot(doc(db, 'feedback', bookingId), (docSnap) => {
-      if (docSnap.exists()) {
-        setFeedback(docSnap.data());
-      }
-    });
-    return () => unsub();
-  }, [bookingId, feedback?.status, feedback?.isHardcoded]);
+  // NOTE: No onSnapshot here intentionally. The parent fetches once via getDoc
+  // and caches the result. A live listener on mount/unmount caused Firestore
+  // internal assertion crashes (ID b815) when the card was collapsed.
+
+  if (isLoading) {
+    return (
+      <div className="ps-pending-box" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '30px 0' }}>
+        <motion.div 
+          animate={{ rotate: 360 }} 
+          transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid var(--border2)', borderTopColor: 'var(--accent)', marginBottom: 8 }}
+        />
+        <div style={{ fontSize: 13, color: 'var(--text2)', textAlign: 'center' }}>
+          Loading feedback...
+        </div>
+      </div>
+    );
+  }
 
   if (!feedback || (feedback.status === 'processing' && !isFeedbackReady(feedback))) {
     return (
@@ -209,7 +222,14 @@ function Scorecard({ bookingId, initialFeedback }) {
         </div>
       )}
 
-      <button className="ps-download-btn">↓ Download full report</button>
+      <Link 
+        to={`/feedback/${bookingId}`} 
+        className="ps-download-btn" 
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center' }}
+      >
+        View Full Report →
+      </Link>
     </motion.div>
   );
 }
@@ -224,10 +244,32 @@ export default function PastSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');       // "All" | "Completed" | "Cancelled"
   const [expanded, setExpanded] = useState(null);   // booking id
+  const [feedbackCache, setFeedbackCache] = useState({});
+  const [loadingFeedbackId, setLoadingFeedbackId] = useState(null);
 
-  const handleToggleExpanded = useCallback((bookingId) => {
-    setExpanded((prev) => (prev === bookingId ? null : bookingId));
-  }, []);
+  const handleToggleExpanded = useCallback(async (bookingId) => {
+    let isOpening = false;
+    setExpanded((prev) => {
+      isOpening = prev !== bookingId;
+      return isOpening ? bookingId : null;
+    });
+
+    if (isOpening && !feedbackCache[bookingId]) {
+      setLoadingFeedbackId(bookingId);
+      try {
+        const fbDoc = await getDoc(doc(db, 'feedback', bookingId));
+        const fbData = fbDoc.exists() ? fbDoc.data() : { status: 'processing' };
+        setFeedbackCache(prev => ({ ...prev, [bookingId]: fbData }));
+      } catch (err) {
+        // If permission is denied, it's highly likely because the document doesn't exist
+        // and the Firestore rules require a matching UID on the resource which fails on null.
+        console.warn("Feedback getDoc error (assuming processing):", err.message);
+        setFeedbackCache(prev => ({ ...prev, [bookingId]: { status: 'processing' } }));
+      } finally {
+        setLoadingFeedbackId(null);
+      }
+    }
+  }, [feedbackCache]);
 
   useEffect(() => {
     let unsubDocs = () => {};
@@ -273,19 +315,11 @@ export default function PastSessionsPage() {
               otherUser = otherDoc.data() || {};
             } catch (_) {}
 
-            // Try fetch feedback doc
-            let feedback = null;
-            try {
-              const fbDoc = await getDoc(doc(db, 'feedback', docSnap.id));
-              if (fbDoc.exists()) feedback = fbDoc.data();
-            } catch (_) {}
-
             merged[docSnap.id] = {
               id: docSnap.id,
               ...bData,
               parsedStartTime: sTime,
               otherUser,
-              feedback,
             };
           }
 
@@ -335,7 +369,7 @@ export default function PastSessionsPage() {
           {/* Header */}
           <div className="ps-header-row">
             <div className="ps-header-left">
-              <h1 className="ps-title">Past Sessions</h1>
+              <h1 className="ps-title">Session History</h1>
               <p className="ps-subtitle">
                 {loading ? '—' : completedCount} session{completedCount !== 1 ? 's' : ''} completed
               </p>
@@ -393,8 +427,9 @@ export default function PastSessionsPage() {
                   : (other.techStack || []).slice(0, 3);
 
                 const isCancelled = b.status === 'cancelled';
-                const overallScore = isFeedbackReady(b.feedback)
-                  ? ((b.feedback.technicalScore || 0) + (b.feedback.communicationScore || 0)) / 2
+                const currentFeedback = feedbackCache[b.id] || b.feedback;
+                const overallScore = isFeedbackReady(currentFeedback)
+                  ? ((currentFeedback.technicalScore || 0) + (currentFeedback.communicationScore || 0)) / 2
                   : null;
 
                 return (
@@ -409,7 +444,7 @@ export default function PastSessionsPage() {
                     onClick={() => handleToggleExpanded(b.id)}
                   >
                     {/* Left accent stripe */}
-                    <div className={`ps-card-accent ${getAccentClass(b)}`} />
+                    <div className={`ps-card-accent ${getAccentClass({ ...b, feedback: currentFeedback })}`} />
 
                     {/* Collapsed row */}
                     <div className="ps-card-row">
@@ -461,10 +496,10 @@ export default function PastSessionsPage() {
                             <div className={`ps-score-pill ${getScoreClass(overallScore)}`}>
                               {overallScore.toFixed(1)}
                             </div>
-                            {b.feedback?.gradedBy === 'gemini' && (
+                            {currentFeedback?.gradedBy === 'gemini' && (
                               <div className="ps-ai-badge">AI graded</div>
                             )}
-                            {(b.feedback?.gradedBy === 'gemini-fallback' || b.feedback?.isHardcoded === true) && (
+                            {(currentFeedback?.gradedBy === 'gemini-fallback' || currentFeedback?.isHardcoded === true) && (
                               <div className="ps-ai-badge">Pending</div>
                             )}
                           </div>
@@ -472,8 +507,13 @@ export default function PastSessionsPage() {
                           <div className="ps-score-pill score-pending">Feedback pending</div>
                         )}
 
-                        {b.feedback && (
-                          <div className="ps-view-report">View report →</div>
+                        {currentFeedback && isFeedbackReady(currentFeedback) && (
+                          <div 
+                            className="ps-view-report" 
+                            onClick={(e) => { e.stopPropagation(); navigate(`/feedback/${b.id}`); }}
+                          >
+                            View Full Report →
+                          </div>
                         )}
 
                         {/* Chevron */}
@@ -503,7 +543,11 @@ export default function PastSessionsPage() {
                           transition={{ duration: 0.28, ease: 'easeInOut' }}
                         >
                           <div className="ps-scorecard-inner">
-                            <Scorecard bookingId={b.id} initialFeedback={b.feedback} />
+                            <Scorecard 
+                              bookingId={b.id} 
+                              initialFeedback={currentFeedback} 
+                              isLoading={loadingFeedbackId === b.id} 
+                            />
                           </div>
                         </motion.div>
                       )}

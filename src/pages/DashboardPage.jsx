@@ -125,7 +125,7 @@ export default function DashboardPage() {
       <PageTransition>
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>
-            Welcome back, {(profile.name || 'User').split(' ')[0]} 👋
+            Welcome back, {(profile.name || 'User').split(' ')[0]}
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'var(--font-body)' }}>
             {isCandidate ? "Here's your interview preparation overview." : "Here's your mentoring activity at a glance."}
@@ -201,7 +201,7 @@ export default function DashboardPage() {
               <div className="dash-panel">
                 <div className="dash-panel-header">
                   Latest Scorecard
-                  {latestFeedback && <Link to="/reports" className="link-text">Full report →</Link>}
+                  {latestFeedback && <Link to={`/feedback/${latestFeedback.id}`} className="link-text">Full report →</Link>}
                 </div>
                 <div className="dash-panel-body">
                   {latestFeedback ? (

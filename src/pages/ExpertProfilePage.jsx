@@ -46,7 +46,20 @@ export default function ExpertProfilePage() {
         unsubSlots();
         unsubSlots = onSnapshot(sQuery, (sSnap) => {
           let sArr = [];
-          sSnap.forEach(d => sArr.push({ id: d.id, ...d.data() }));
+          sSnap.forEach(d => {
+            const data = d.data();
+            const sTime = data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime);
+            if (sTime < new Date()) {
+              // Auto-delete expired unbooked slots from the interviewer side
+              if (u && u.uid === uid) {
+                import('firebase/firestore').then(({ deleteDoc, doc }) => {
+                  deleteDoc(doc(db, 'availability', uid, 'slots', d.id)).catch(() => {});
+                });
+              }
+            } else {
+              sArr.push({ id: d.id, ...data });
+            }
+          });
           sArr.sort((a,b) => {
             const dA = a.startTime?.toDate ? a.startTime.toDate() : new Date(a.startTime);
             const dB = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime);
@@ -246,7 +259,7 @@ export default function ExpertProfilePage() {
                           </div>
                           <div className="ep-slot-v-line" />
                           <div className="ep-slot-info-main">
-                            <div className="ep-slot-time-text">{sTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (60 mins)</div>
+                            <div className="ep-slot-time-text">{sTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} ({slot.durationMinutes || 60} mins)</div>
                             <div className="ep-slot-row-meta">
                               {past ? (
                                 <span style={{ background: 'rgba(192,71,58,0.1)', color: '#d4594a', border: '1px solid rgba(192,71,58,0.2)', borderRadius: '4px', padding: '2px 8px', fontSize: '10px', fontWeight: 600 }}>Expired</span>

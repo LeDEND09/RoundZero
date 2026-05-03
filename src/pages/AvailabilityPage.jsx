@@ -62,7 +62,12 @@ export default function AvailabilityPage() {
         const data = d.data();
         // Client-side filter
         if (data.isBooked === false) {
-          fetched.push({ id: d.id, ...data });
+          const sTime = data.startTime ? new Date(data.startTime) : new Date();
+          if (sTime < new Date()) {
+            deleteDoc(doc(db, 'availability', currentUser.uid, 'slots', d.id)).catch(() => {});
+          } else {
+            fetched.push({ id: d.id, ...data });
+          }
         }
       });
       // Client-side sort
