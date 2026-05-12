@@ -4,7 +4,7 @@ import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, onSnapshot, serverTimestamp, increment } from 'firebase/firestore';
 import { ref, onValue, set } from 'firebase/database';
-import { supabase } from '../supabase';
+
 import Editor from '@monaco-editor/react';
 import {
   StreamVideo,
@@ -384,6 +384,7 @@ export default function RoomPage() {
   const [chatClient, setChatClient] = useState(null);
   const [chatChannel, setChatChannel] = useState(null);
   const chatClientRef = useRef(null);
+  const initStreamSessionInProgress = useRef(false);
 
   async function initStreamChat(token, uid, displayName, channelMembers = []) {
     try {
@@ -896,6 +897,9 @@ export default function RoomPage() {
   }, [navigate, callId]);
 
   const initRealStreamSession = async (userData, realName, appRole = 'candidate') => {
+    if (clientRef.current || initStreamSessionInProgress.current) return;
+    initStreamSessionInProgress.current = true;
+
     const displayName = realName || userData.displayName || 'Anonymous';
     try {
       // Resolve booking first so token API can pre-create the chat channel with both members.
@@ -967,6 +971,7 @@ export default function RoomPage() {
       setInitError(err.message || 'Stream connection failed');
       setIsCallReady(false);
       setLoading(false);
+      initStreamSessionInProgress.current = false;
     }
   };
 
