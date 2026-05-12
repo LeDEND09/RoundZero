@@ -281,6 +281,7 @@
 }
 
 .cp-section-label {
+  display: block;
   font-family: 'DM Sans', sans-serif;
   font-size: 10px;
   font-weight: 600;
@@ -309,15 +310,29 @@
 }
 
 .cp-chip {
-  background: var(--surface2);
+  background: transparent;
   border: 1px solid var(--border2);
   border-radius: 6px;
   padding: 5px 10px;
   font-size: 12px;
-  color: var(--text2);
+  color: var(--text3);
   display: flex;
   align-items: center;
   gap: 4px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.cp-chip:hover {
+  background: var(--surface2);
+  color: var(--text2);
+}
+
+.cp-chip.active {
+  background: rgba(184, 150, 90, 0.12);
+  border-color: rgba(184, 150, 90, 0.4);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .cp-focus-item {
@@ -377,6 +392,69 @@
   color: var(--text3);
   line-height: 1.6;
   margin-top: 6px;
+}
+
+/* EDIT FORMS */
+.cp-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.cp-input:focus {
+  border-color: var(--accent);
+}
+
+.cp-input::placeholder {
+  color: var(--text3);
+}
+
+.cp-save-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.cp-save-btn:hover {
+  opacity: 0.9;
+}
+
+.cp-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cp-ghost-btn {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cp-ghost-btn:hover {
+  border-color: var(--text2);
+  color: var(--text);
 }
 
 /* SECTION 4: RECENT SESSIONS */

@@ -347,6 +347,12 @@ This file tracks our progress and implemented features chronologically for the *
   - **Room Controls Readability**: Increased contrast for the Stream participant options menu (3-dots popover) to improve visibility during interviews.
   - **AI Question Reliability**: Hardened `fetchAiQuestions()` and `api/generateQuestions.js` response parsing with safer fallback behavior when model output is malformed or empty.
 
+- [x] **K7: Authentication & Profile Refinements**
+  - **Google Auth Gating**: Refactored `LoginPage.jsx` to intercept new Google sign-ups, presenting a "Role Selection" (Expert vs. Candidate) step before creating the user document in Firestore.
+  - **Dynamic Expert Metrics**: Updated `ExpertProfilePage` and `CandidateProfilePage` to dynamically calculate "Technical Depth", "Communication Focus", and "Pressure" from actual candidate reviews rather than manual inputs. Removed manual metric sliders.
+  - **Expert Edit Profile Refactor**: Replaced the popup `AnimatePresence` modal for Experts with a sleek, inline 3-column grid, aligning the editing experience with the Candidate profile UI.
+  - **Interactive Chip States**: Added prominent visual active states (gold tint, bold text) for selected "Tech Stack", "Expertise Domains", and "Interview Focus" tags in the Edit Profile panels for clear UX.
+
 ---
 *Status: RoundZero is now a high-performance, real-time interview environment. Feature set covers Video, Chat, AI Assistance, Collaborative Coding, Role-Specific Onboarding, and Live Expert Evaluation.*
 

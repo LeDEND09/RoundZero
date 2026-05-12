@@ -465,7 +465,6 @@ export default function RoomPage() {
     callRef.current = null;
     clientRef.current = null;
 
-    stopRecording();
     stopAllTracks();
 
     if (chatClientRef.current) {
@@ -499,7 +498,6 @@ export default function RoomPage() {
 
     setCall(null);
     setParticipantCount(0);
-    recordingStartTriggeredRef.current = false;
 
     // Force release all media devices
     if (navigator.mediaDevices) {
@@ -511,15 +509,7 @@ export default function RoomPage() {
   }
 
   // Recording State
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingStatus, setRecordingStatus] = useState('idle');
-  const [recordingError, setRecordingError] = useState(null);
   const [participantCount, setParticipantCount] = useState(0);
-  const recordingStartTriggeredRef = useRef(false);
-
-  // Recording Refs
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
 
   // Legacy state for cleanup
   const [call, setCall] = useState(null);
@@ -1032,122 +1022,6 @@ export default function RoomPage() {
     }
   };
 
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100
-        }
-      });
-      micStreamRef.current = stream;
-
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType,
-        audioBitsPerSecond: 64000
-      });
-
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        stopAllTracks();
-        await uploadAudioAndGrade(audioBlob);
-      };
-
-      mediaRecorder.start(10000);
-      mediaRecorderRef.current = mediaRecorder;
-      setIsRecording(true);
-      setRecordingStatus('recording');
-
-      stream.getTracks().forEach(track => {
-        track.addEventListener('ended', () => {
-          if (mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-          }
-        });
-      });
-    } catch (err) {
-      console.error('Recording failed to start:', err);
-      setRecordingError('Microphone access denied');
-      setRecordingStatus('error');
-    }
-  }
-
-  useEffect(() => {
-    if (DEV_MODE || !isCallReady) return;
-    if (recordingStartTriggeredRef.current) return;
-    if (participantCount < 2) return;
-
-    recordingStartTriggeredRef.current = true;
-    startRecording();
-  }, [participantCount, isCallReady]);
-
-  function stopRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      setRecordingStatus('uploading');
-    }
-  }
-
-  async function uploadAudioAndGrade(audioBlob) {
-    try {
-      setRecordingStatus('uploading');
-
-      const userRole = profile?.role;
-      const fileName = `${callId}_${userRole}_${Date.now()}.webm`;
-
-      const { data, error } = await supabase.storage
-        .from('interview-recordings')
-        .upload(fileName, audioBlob, {
-          contentType: 'audio/webm',
-          upsert: false
-        });
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from('interview-recordings')
-        .getPublicUrl(fileName);
-
-      const audioUrl = urlData.publicUrl;
-      const audioField = userRole === 'expert' ? 'expertAudioUrl' : 'candidateAudioUrl';
-      const audioPathField = userRole === 'expert' ? 'expertAudioPath' : 'candidateAudioPath';
-
-      const bookingDoc = await getBookingForCurrentUserAndCall(user?.uid);
-      if (bookingDoc) {
-        const bookingId = bookingDoc.id;
-        const bookingData = bookingDoc.data();
-
-        await updateDoc(doc(db, 'bookings', bookingId), {
-          [audioField]: audioUrl,
-          [audioPathField]: fileName,
-          [`${audioField}UploadedAt`]: serverTimestamp()
-        });
-
-        // Gemini grading is intentionally disconnected for now.
-        // Phase E will re-enable backend grading when audio pipeline is ready.
-      }
-
-      setRecordingStatus('done');
-      setTimeout(() => setRecordingStatus('idle'), 4000);
-    } catch (err) {
-      console.error('Upload failed:', err);
-      setRecordingStatus('error');
-      setRecordingError('Failed to upload recording');
-    }
-  }
 
   useEffect(() => {
     const interval = setInterval(() => setElapsedSeconds(prev => prev + 1), 1000);
@@ -1164,7 +1038,6 @@ export default function RoomPage() {
   }, []);
 
   const handleLeave = async () => {
-    stopRecording();
 
     // Save final scorecard to Firestore if expert
     if (profile?.role === 'expert' && user) {
@@ -1404,7 +1277,7 @@ export default function RoomPage() {
             Dev mode — recording disabled until Stream token is live
           </div>
         )}
-        {!DEV_MODE && isCallReady && recordingStatus === 'idle' && participantCount < 2 && (
+        {!DEV_MODE && isCallReady && participantCount < 2 && (
           <div style={{
             width: '100%',
             padding: '6px 20px',
@@ -1422,36 +1295,18 @@ export default function RoomPage() {
             Waiting for both participants to join before recording starts...
           </div>
         )}
-        {!DEV_MODE && recordingStatus !== 'idle' && (
+        {!DEV_MODE && isCallReady && participantCount >= 2 && (
           <div style={{
             width: '100%', padding: '6px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', fontFamily: 'var(--font-ui)', zIndex: 20,
-            ...(recordingStatus === 'recording' ? { background: 'rgba(192,71,58,0.15)', borderBottom: '1px solid rgba(192,71,58,0.2)', color: '#d4594a' } :
-              recordingStatus === 'uploading' ? { background: 'rgba(184,150,90,0.1)', borderBottom: '1px solid rgba(184,150,90,0.15)', color: '#d4af76' } :
-                recordingStatus === 'done' ? { background: 'rgba(74,158,110,0.1)', borderBottom: '1px solid rgba(74,158,110,0.15)', color: '#4a9e6e' } :
-                  { background: 'rgba(192,71,58,0.1)', color: '#d4594a' })
+            background: 'rgba(192,71,58,0.15)', borderBottom: '1px solid rgba(192,71,58,0.2)', color: '#d4594a'
           }}>
-            {recordingStatus === 'recording' && (
-              <>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#d4594a', animation: 'pulse 1.5s infinite' }}></div>
-                Recording in progress — do not close this tab
-              </>
-            )}
-            {recordingStatus === 'uploading' && (
-              <>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="4.93" x2="19.07" y2="7.76"></line></svg>
-                Uploading recording...
-              </>
-            )}
-            {recordingStatus === 'done' && '✓ Recording saved — feedback will appear in Past Sessions'}
-            {recordingStatus === 'error' && `⚠ ${recordingError}`}
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#d4594a', animation: 'pulse 1.5s infinite' }}></div>
+            Recording in progress — do not close this tab
             <style>{`
                @keyframes pulse {
                  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(212, 89, 74, 0.7); }
                  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(212, 89, 74, 0); }
                  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(212, 89, 74, 0); }
-               }
-               @keyframes spin {
-                 100% { transform: rotate(360deg); }
                }
              `}</style>
           </div>

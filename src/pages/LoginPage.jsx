@@ -38,6 +38,8 @@ export default function LoginPage() {
   const [errorVisible, setErrorVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successFlash, setSuccessFlash] = useState(false);
+  
+  const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
 
   useEffect(() => {
     // Auth state guard - more robust check for onboarding status
@@ -92,15 +94,9 @@ export default function LoginPage() {
       const userSnap = await getDoc(userDocRef);
 
       if (!userSnap.exists()) {
-        // Create basic profile for new Google user with selected role
-        await setDoc(userDocRef, {
-          name: user.displayName || 'Anonymous User',
-          email: user.email,
-          role,
-          createdAt: serverTimestamp(),
-          onboarded: false
-        });
-        triggerSuccessSequence('/onboarding');
+        // Instead of creating the profile immediately, prompt the user for their role
+        setPendingGoogleUser(user);
+        setActiveTab('signup');
       } else {
         // Profile already exists - branch based on onboarding status
         const pData = userSnap.data();
@@ -121,6 +117,29 @@ export default function LoginPage() {
       
       setErrorMessage(mapFirebaseError(error.code));
       setErrorVisible(true);
+    }
+  };
+
+  const finalizeGoogleSignIn = async () => {
+    if (!pendingGoogleUser) return;
+    setIsLoading(true);
+    setErrorVisible(false);
+    
+    try {
+      const userDocRef = doc(db, 'users', pendingGoogleUser.uid);
+      await setDoc(userDocRef, {
+        name: pendingGoogleUser.displayName || 'Anonymous User',
+        email: pendingGoogleUser.email,
+        role,
+        createdAt: serverTimestamp(),
+        onboarded: false
+      });
+      triggerSuccessSequence('/onboarding');
+    } catch (error) {
+      console.error(error);
+      setErrorMessage('Failed to create account. Please try again.');
+      setErrorVisible(true);
+      setIsLoading(false);
     }
   };
 
@@ -736,73 +755,121 @@ export default function LoginPage() {
           <div style={{ position: 'absolute', top: '-1px', left: '-1px', width: '16px', height: '16px', borderTop: '1px solid var(--lp-corner-border)', borderLeft: '1px solid var(--lp-corner-border)', borderTopLeftRadius: 'var(--lp-card-radius)' }} />
           <div style={{ position: 'absolute', top: '-1px', right: '-1px', width: '16px', height: '16px', borderTop: '1px solid var(--lp-corner-border)', borderRight: '1px solid var(--lp-corner-border)', borderTopRightRadius: 'var(--lp-card-radius)' }} />
 
-          <div className="lp-tab-switcher">
-            <div 
-              className={`lp-tab ${activeTab === 'login' ? 'active' : ''}`}
-              onClick={() => { setActiveTab('login'); setErrorVisible(false); }}
-            >
-              Log in
-            </div>
-            <div 
-              className={`lp-tab ${activeTab === 'signup' ? 'active' : ''}`}
-              onClick={() => { setActiveTab('signup'); setErrorVisible(false); }}
-            >
-              Sign up
-            </div>
-          </div>
-
-          {activeTab === 'signup' && (
-            <div style={{ display: 'flex', gap: '14px', marginBottom: '14px' }}>
-              {[
-                { id: 'candidate', label: 'Candidate', emoji: '🎯' },
-                { id: 'expert', label: 'Expert', emoji: '🧠' }
-              ].map(r => (
-                <motion.div
-                  key={`google-${r.id}`}
-                  className={`lp-role-card ${role === r.id ? 'selected' : ''}`}
-                  onClick={() => setRole(r.id)}
-                  whileTap={{ scale: 0.97 }}
-                  layout
-                >
-                  <div className="lp-role-emoji">{r.emoji}</div>
-                  <div className="lp-role-label">{r.label}</div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-
-          <motion.button 
-            type="button"
-            className="lp-google-btn" 
-            onClick={handleGoogleSignIn}
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {GOOGLE_ICON}
-            Continue with Google
-          </motion.button>
-
-          {activeTab === 'signup' && (
-            <div className="lp-google-role-hint">
-              Signing up as: <strong>{role === 'expert' ? 'Expert' : 'Candidate'}</strong>
-            </div>
-          )}
-
-          <div className="lp-or-divider">
-            <div className="lp-or-line" />
-            <div className="lp-or-text">or</div>
-            <div className="lp-or-line" />
-          </div>
-
-          <form onSubmit={handleEmailAuth} style={{ display: 'flex', flexDirection: 'column' }}>
+          {pendingGoogleUser ? (
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeTab}
+                key="google-role-select"
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.18 }}
               >
+                <h3 style={{ fontFamily: 'var(--font-display)', color: 'var(--lp-text)', fontSize: '20px', marginBottom: '8px', textAlign: 'center' }}>
+                  Almost there!
+                </h3>
+                <p style={{ color: 'var(--lp-text2)', fontSize: '13px', textAlign: 'center', marginBottom: '20px', fontFamily: 'var(--font-body)' }}>
+                  How would you like to use RoundZero?
+                </p>
+
+                <div style={{ display: 'flex', gap: '14px', marginBottom: '20px' }}>
+                  {[
+                    { id: 'candidate', label: 'Candidate', emoji: '🎯' },
+                    { id: 'expert', label: 'Expert', emoji: '🧠' }
+                  ].map(r => (
+                    <motion.div
+                      key={`google-pending-${r.id}`}
+                      className={`lp-role-card ${role === r.id ? 'selected' : ''}`}
+                      onClick={() => setRole(r.id)}
+                      whileTap={{ scale: 0.97 }}
+                      layout
+                    >
+                      <div className="lp-role-emoji">{r.emoji}</div>
+                      <div className="lp-role-label">{r.label}</div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                <motion.button 
+                  type="button"
+                  className="lp-submit-btn" 
+                  onClick={finalizeGoogleSignIn}
+                  disabled={isLoading}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isLoading ? 'Creating Account...' : 'Complete Sign Up'}
+                </motion.button>
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+            <>
+              <div className="lp-tab-switcher">
+                <div 
+                  className={`lp-tab ${activeTab === 'login' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('login'); setErrorVisible(false); }}
+                >
+                  Log in
+                </div>
+                <div 
+                  className={`lp-tab ${activeTab === 'signup' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('signup'); setErrorVisible(false); }}
+                >
+                  Sign up
+                </div>
+              </div>
+
+              {activeTab === 'signup' && (
+                <div style={{ display: 'flex', gap: '14px', marginBottom: '14px' }}>
+                  {[
+                    { id: 'candidate', label: 'Candidate', emoji: '🎯' },
+                    { id: 'expert', label: 'Expert', emoji: '🧠' }
+                  ].map(r => (
+                    <motion.div
+                      key={`google-${r.id}`}
+                      className={`lp-role-card ${role === r.id ? 'selected' : ''}`}
+                      onClick={() => setRole(r.id)}
+                      whileTap={{ scale: 0.97 }}
+                      layout
+                    >
+                      <div className="lp-role-emoji">{r.emoji}</div>
+                      <div className="lp-role-label">{r.label}</div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
+              <motion.button 
+                type="button"
+                className="lp-google-btn" 
+                onClick={handleGoogleSignIn}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {GOOGLE_ICON}
+                Continue with Google
+              </motion.button>
+
+              {activeTab === 'signup' && (
+                <div className="lp-google-role-hint">
+                  Signing up as: <strong>{role === 'expert' ? 'Expert' : 'Candidate'}</strong>
+                </div>
+              )}
+
+              <div className="lp-or-divider">
+                <div className="lp-or-line" />
+                <div className="lp-or-text">or</div>
+                <div className="lp-or-line" />
+              </div>
+
+              <form onSubmit={handleEmailAuth} style={{ display: 'flex', flexDirection: 'column' }}>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.18 }}
+                  >
                 {activeTab === 'signup' && (
                   <input
                     type="text"
@@ -879,6 +946,8 @@ export default function LoginPage() {
                 : (activeTab === 'login' ? "Log in to RoundZero" : "Create my account →")}
             </motion.button>
           </form>
+          </>
+          )}
 
         </motion.div>
 

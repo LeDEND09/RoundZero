@@ -73,8 +73,28 @@ export default function ExpertProfilePage() {
           const rQuery = query(collection(db, 'users', uid, 'reviews'));
           const rSnap = await getDocs(rQuery);
           let rArr = [];
-          rSnap.forEach(d => rArr.push({ id: d.id, ...d.data() }));
+          let tDepth = 0, cFocus = 0, fPress = 0, rCount = 0;
+          
+          rSnap.forEach(d => {
+            const data = d.data();
+            rArr.push({ id: d.id, ...data });
+            if (data.technicalDepth !== undefined) {
+              tDepth += Number(data.technicalDepth);
+              cFocus += Number(data.communicationFocus || 50);
+              fPress += Number(data.followUpPressure || 50);
+              rCount++;
+            }
+          });
           setReviews(rArr);
+          
+          // Calculate averages from reviews for read-only display
+          setExpert(prev => ({
+            ...prev,
+            technicalDepth: rCount > 0 ? Math.round(tDepth / rCount) : 50,
+            communicationFocus: rCount > 0 ? Math.round(cFocus / rCount) : 50,
+            followUpPressure: rCount > 0 ? Math.round(fPress / rCount) : 50
+          }));
+          
         } catch(err) {
           console.log("No reviews collection found");
         }

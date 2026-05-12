@@ -33,7 +33,13 @@ RoundZero creates an immersive, real-time environment that:
 
 ### 🔐 Authentication & Onboarding
 *   **Secure Auth**: Google OAuth and Email/Password integration via Firebase.
+*   **Google Auth Gating**: Intercepts new Google Sign-Ins to allow users to select their role (Expert vs. Candidate) before profile creation.
 *   **Dual-Role Onboarding**: Tailored registration flows for **Candidates** (Experience, Target Role, Bio) and **Experts** (Tech Stack, Professional Title, LinkedIn).
+
+### 👤 Profile Management & Metrics
+*   **Dynamic Expert Metrics**: "Technical Depth", "Communication Focus", and "Pressure" scores are automatically aggregated and calculated from authentic candidate post-session reviews.
+*   **Unified Profile Editing**: Sleek, inline 3-column grid layouts for both Experts and Candidates to manage their domains, tech stack, and professional bios seamlessly.
+*   **Interactive Tagging**: Visually distinct state-management (gold highlighting) for selecting tech stacks and interview focus areas.
 
 ### 🤝 The Marketplace
 *   **Expert Explore**: Real-time searchable grid of industry experts with domain-based filtering.
@@ -153,12 +159,9 @@ While the frontend provides an immersive experience, the backend orchestrates a 
 ## 🚧 8. Current Limitations & Future Roadmap
 
 ### Current Limitations
-*   **Hardcoded AI Feedback**: Due to the high compute costs and quota limits associated with real-time video/audio analysis (Gemini Multimodal API), the feedback generation currently utilizes a **Template-Based Engine** (`api/generateHardcodedFeedback.js`).
-    *   *Note*: The data structure, schema, and UI display of this feedback are **identical** to the live AI output, allowing for a "plug-and-play" transition once the paid API tier is enabled.
 *   **Single-Region Latency**: Real-time code sync is currently optimized for a single region (Firebase RTDB default).
 
 ### Future Roadmap
-*   **Live Gemini Integration**: Full integration of the multimodal video analyzer once API quotas are scaled.
 *   **Interactive Coding Replay**: A "Time-Travel" feature to replay exactly how a candidate wrote their code during the session.
 *   **Mock Marketplace Payments**: Integration of Stripe to allow experts to monetize their time.
 

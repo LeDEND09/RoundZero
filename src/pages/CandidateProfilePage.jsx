@@ -122,8 +122,35 @@ export default function CandidateProfilePage() {
              const rQuery = query(collection(db, 'users', u.uid, 'reviews'));
              const rSnap = await getDocs(rQuery);
              let rArr = [];
-             rSnap.forEach(d => rArr.push({ id: d.id, ...d.data() }));
+             let tDepth = 0, cFocus = 0, fPress = 0, rCount = 0;
+             rSnap.forEach(d => {
+               const data = d.data();
+               rArr.push({ id: d.id, ...data });
+               if (data.technicalDepth !== undefined) {
+                 tDepth += Number(data.technicalDepth);
+                 cFocus += Number(data.communicationFocus || 50);
+                 fPress += Number(data.followUpPressure || 50);
+                 rCount++;
+               }
+             });
              setReviews(rArr);
+             
+             // Calculate averages from reviews for read-only display
+             if (rCount > 0) {
+               setProfile(prev => ({
+                 ...prev,
+                 technicalDepth: Math.round(tDepth / rCount),
+                 communicationFocus: Math.round(cFocus / rCount),
+                 followUpPressure: Math.round(fPress / rCount)
+               }));
+             } else {
+               setProfile(prev => ({
+                 ...prev,
+                 technicalDepth: 50,
+                 communicationFocus: 50,
+                 followUpPressure: 50
+               }));
+             }
           }
         }
 
@@ -261,7 +288,7 @@ export default function CandidateProfilePage() {
                     <span className="ep-stat-lbl-small">Response</span>
                   </div>
                 </div>
-                <button className="ep-edit-btn-hero" onClick={handleEditToggle}>
+                <button className="ep-edit-btn-hero" onClick={() => { handleEditToggle(); window.scrollBy({ top: 400, behavior: 'smooth' }); }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                   Edit Profile
                 </button>
@@ -297,6 +324,93 @@ export default function CandidateProfilePage() {
                 <div className="ep-metric-bar-fill" style={{ width: `${profile.followUpPressure || 50}%` }} />
               </div>
             </motion.div>
+          </div>
+
+          {/* SECTION 2.5: THREE COLUMN GRID (EXPERT EXPERTISE & EDIT) */}
+          <div className="cp-main-grid">
+             {/* COLUMN 1: EXPERTISE */}
+             <div className="cp-grid-card">
+                <div className="cp-grid-header">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                  <h3 className="cp-grid-title">My Expertise</h3>
+                </div>
+                <div className="cp-grid-body">
+                   <div>
+                     <div className="cp-section-label">Domains</div>
+                     <div className="cp-chips-row">
+                        {(profile.domains || []).map(d => (
+                          <span key={d} className="cp-chip">{d}</span>
+                        ))}
+                        {(!profile.domains || profile.domains.length === 0) && <span style={{ fontSize: '12px', color: 'var(--text3)' }}>No domains added</span>}
+                     </div>
+                   </div>
+                   <div style={{ marginTop: '16px' }}>
+                     <div className="cp-section-label">Professional Title</div>
+                     <div className="cp-target-role-pill" style={{ fontSize: '13px', padding: '6px 14px' }}>{profile.title || 'Expert'}</div>
+                   </div>
+                </div>
+             </div>
+
+             {/* COLUMN 2: BIO & COMPANY */}
+             <div className="cp-grid-card">
+                <div className="cp-grid-header">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  <h3 className="cp-grid-title">About</h3>
+                </div>
+                <div className="cp-grid-body">
+                   <div className="cp-section-label">Bio</div>
+                   <p style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.6, margin: 0 }}>
+                     {profile.bio || 'Add a bio to help candidates understand your background and what you can offer.'}
+                   </p>
+                </div>
+             </div>
+
+             {/* COLUMN 3: EDIT PROFILE */}
+             <div className="cp-grid-card">
+                <div className="cp-grid-header">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  <h3 className="cp-grid-title">Edit Profile</h3>
+                  {isEditing && (
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                      <button className="cp-save-btn" onClick={handleSave} disabled={saving} style={{ fontSize: '11px', padding: '4px 12px' }}>{saving ? 'Saving...' : 'Save'}</button>
+                      <button className="cp-ghost-btn" onClick={handleEditToggle} style={{ fontSize: '11px', padding: '4px 12px' }}>Cancel</button>
+                    </div>
+                  )}
+                </div>
+                <div className="cp-grid-body">
+                   {!isEditing ? (
+                     <div className="cp-edit-panel-empty">
+                        <svg className="cp-edit-illustration" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        <div className="cp-edit-title">Update your profile</div>
+                        <div className="cp-edit-desc">Keep your domains and bio current to attract the right candidates</div>
+                        <button className="cp-btn-edit-ghost" style={{ marginTop: '20px' }} onClick={handleEditToggle}>Modify Details</button>
+                     </div>
+                   ) : (
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div>
+                          <label className="cp-section-label">Name</label>
+                          <input className="cp-input" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="cp-section-label">Professional Title</label>
+                          <input className="cp-input" value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="cp-section-label">Expertise Domains</label>
+                          <div className="cp-chips-row">
+                             {DOMAIN_OPTS.map(d => (
+                               <span key={d} onClick={() => setFormData({...formData, domains: toggleArrayItem(formData.domains || [], d)})} className={`cp-chip ${formData.domains?.includes(d) ? 'active' : ''}`} style={{ cursor: 'pointer' }}>{d}</span>
+                             ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="cp-section-label">Bio</label>
+                          <textarea className="cp-input" value={formData.bio || ''} onChange={e => setFormData({...formData, bio: e.target.value})} style={{ minHeight: '80px', resize: 'vertical' }} />
+                        </div>
+                     </div>
+                   )}
+                </div>
+             </div>
           </div>
 
           {/* SECTION 3: TABBED CONTENT AREA */}
@@ -442,66 +556,7 @@ export default function CandidateProfilePage() {
              )}
           </div>
 
-          {/* EDIT OVERLAY */}
-          <AnimatePresence>
-            {isEditing && (
-              <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }}
-                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-              >
-                <motion.div 
-                  initial={{ scale: 0.9, y: 20 }}
-                  animate={{ scale: 1, y: 0 }}
-                  exit={{ scale: 0.9, y: 20 }}
-                  style={{ background: 'var(--surface)', width: '100%', maxWidth: '600px', borderRadius: '18px', padding: '32px', position: 'relative', border: '1px solid var(--border)' }}
-                >
-                   <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: '24px' }}>Edit Expert Profile</h2>
-                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '10px' }}>
-                      <div>
-                        <label className="cp-section-label">Name</label>
-                        <input className="cp-input" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="cp-section-label">Professional Title</label>
-                        <input className="cp-input" value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="cp-section-label">Expertise Domains</label>
-                        <div className="cp-chips-row">
-                          {DOMAIN_OPTS.map(d => (
-                            <span key={d} onClick={() => setFormData({...formData, domains: toggleArrayItem(formData.domains || [], d)})} className={`cp-chip ${formData.domains?.includes(d) ? '' : 'cp-tag-inactive'}`} style={{ cursor: 'pointer' }}>{d}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="cp-section-label">Bio</label>
-                        <textarea className="cp-input" value={formData.bio || ''} onChange={e => setFormData({...formData, bio: e.target.value})} style={{ minHeight: '100px' }} />
-                      </div>
-                      <div>
-                         <label className="cp-section-label">Interview Style</label>
-                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {['technicalDepth', 'communicationFocus', 'followUpPressure'].map(key => (
-                              <div key={key}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                                  <span>{key === 'technicalDepth' ? 'Tech Depth' : key === 'communicationFocus' ? 'Comm Focus' : 'Pressure'}</span>
-                                  <span>{formData[key] || 50}%</span>
-                                </div>
-                                <input type="range" style={{ width: '100%' }} value={formData[key] || 50} onChange={e => setFormData({...formData, [key]: parseInt(e.target.value)})} />
-                              </div>
-                            ))}
-                         </div>
-                      </div>
-                   </div>
-                   <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
-                     <button className="cp-save-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</button>
-                     <button className="cp-ghost-btn" style={{ flex: 1 }} onClick={handleEditToggle}>Cancel</button>
-                   </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
 
         </div>
       </PageLayout>
@@ -704,7 +759,7 @@ export default function CandidateProfilePage() {
                         <label className="cp-section-label">Tech Stack</label>
                         <div className="cp-chips-row">
                            {TECH_OPTS.map(opt => (
-                             <span key={opt} onClick={() => setFormData({...formData, techStack: toggleArrayItem(formData.techStack || [], opt)})} className={`cp-chip ${formData.techStack?.includes(opt) ? '' : 'cp-tag-inactive'}`} style={{ cursor: 'pointer' }}>{opt}</span>
+                             <span key={opt} onClick={() => setFormData({...formData, techStack: toggleArrayItem(formData.techStack || [], opt)})} className={`cp-chip ${formData.techStack?.includes(opt) ? 'active' : ''}`} style={{ cursor: 'pointer' }}>{opt}</span>
                            ))}
                         </div>
                       </div>
@@ -712,7 +767,7 @@ export default function CandidateProfilePage() {
                         <label className="cp-section-label">Interview Focus</label>
                         <div className="cp-chips-row">
                            {FOCUS_OPTS.map(opt => (
-                             <span key={opt} onClick={() => setFormData({...formData, interviewFocus: toggleArrayItem(formData.interviewFocus || [], opt)})} className={`cp-chip ${formData.interviewFocus?.includes(opt) ? '' : 'cp-tag-inactive'}`} style={{ cursor: 'pointer' }}>{opt}</span>
+                             <span key={opt} onClick={() => setFormData({...formData, interviewFocus: toggleArrayItem(formData.interviewFocus || [], opt)})} className={`cp-chip ${formData.interviewFocus?.includes(opt) ? 'active' : ''}`} style={{ cursor: 'pointer' }}>{opt}</span>
                            ))}
                         </div>
                       </div>
